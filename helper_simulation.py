@@ -1,11 +1,10 @@
-from threadpoolctl import threadpool_limits
 import pandas as pd
+import numpy as np 
+from threadpoolctl import threadpool_limits
 from tigramite import data_processing as pp
 from tigramite import plotting as tp
 from tigramite.pcmci import PCMCI
 import matplotlib.pyplot as plt
-import numpy as np 
-import networkx as nx
 from tigramite.independence_tests import CondIndTest
 from matplotlib.colors import LinearSegmentedColormap
 from scipy import stats
@@ -52,23 +51,23 @@ def linear_transformation(X,b,transform_back=True):
     
 
 
-def dag_to_graph_for(adjacency_matrix,edges_dict,ignore_direction=False,granger=False):
-    variable_num=adjacency_matrix.shape[0]
+# def dag_to_graph_for(adjacency_matrix,edges_dict,ignore_direction=False,granger=False):
+#     variable_num=adjacency_matrix.shape[0]
 
-    if adjacency_matrix.ndim==2:
-        edge_shape=np.zeros(shape=(variable_num,variable_num,1), dtype='<U3')
-    else:
-        edge_shape=np.zeros_like(adjacency_matrix, dtype='<U3')
-    for start_i,end_i in edges_dict.keys(): ##[TODO] 确认edges_dict的key 是不是从0开始的(并且当然要为adjacency_matrix的index)
-        edge_shape[start_i,end_i,0]="-->" if not ignore_direction else "o-o"
-        if not granger:
-            edge_shape[end_i,start_i,0]="<--" if not ignore_direction else "o-o"
-    if granger:
-        edge_shape_2=np.zeros(shape=(variable_num, variable_num, 2), dtype='<U3')
-        edge_shape_2[:,:,[1]]=edge_shape
-        return edge_shape_2
-    else:   
-        return edge_shape
+#     if adjacency_matrix.ndim==2:
+#         edge_shape=np.zeros(shape=(variable_num,variable_num,1), dtype='<U3')
+#     else:
+#         edge_shape=np.zeros_like(adjacency_matrix, dtype='<U3')
+#     for start_i,end_i in edges_dict.keys(): ##[TODO] 确认edges_dict的key 是不是从0开始的(并且当然要为adjacency_matrix的index)
+#         edge_shape[start_i,end_i,0]="-->" if not ignore_direction else "o-o"
+#         if not granger:
+#             edge_shape[end_i,start_i,0]="<--" if not ignore_direction else "o-o"
+#     if granger:
+#         edge_shape_2=np.zeros(shape=(variable_num, variable_num, 2), dtype='<U3')
+#         edge_shape_2[:,:,[1]]=edge_shape
+#         return edge_shape_2
+#     else:   
+#         return edge_shape
 
 def draw_dag(adjacency_matrix,edges_dict,pathh,nodes):
     variable_num=adjacency_matrix.shape[0]
@@ -538,7 +537,7 @@ Author: Angus
 Description:
     This function generates a directed acyclic graph (DAG) with a specified number of nodes and a given edge probability (<0.1).
     The function can also generate a lagged causal DAG if specified (with contemporaneous edges unexists).
-    The generated DAG is represented as a NetworkX DiGraph, an adjacency matrix, and a dictionary of edges with their weights.
+    The generated DAG is represented as a an adjacency matrix, and a edge matrix
 
 Parameters:
     num_nodes (int): The number of nodes in the DAG.
@@ -546,83 +545,63 @@ Parameters:
     lagged_causal (bool): If True, generates a lagged causal DAG. Default is False.
 
 Returns:
-    dag (networkx.DiGraph): The generated DAG.
     adjacency_matrix (numpy.ndarray): The adjacency matrix of the DAG. (shape: num_nodes * num_nodes). for lagged causal, the adjacency matrix is B[1:num_nodes,num_nodes:2*num_nodes] (the part of one-step lagged causal).
-    edges (dict): A dictionary where keys are tuples representing edges and values are the weights of the edges.
+    edges matrix(numpy.ndarray): 
 '''
 
 def generate_dag(num_nodes, edge_probability=0.3,lagged_causal=False):
-    dag = nx.DiGraph()
 
-    # 添加节点
-    dag.add_nodes_from(range(num_nodes))
 
-    
-    if lagged_causal:
+    # generate adjacency matrix B
+    adjacency_matrix = np.zeros((num_nodes, num_nodes))
+    if lagged_causal: 
         for i in range(num_nodes):
             for j in range(num_nodes):
                 if np.random.rand() < edge_probability:
-                    dag.add_edge(i, j, weight=np.random.rand())  # 边的权重为介于 0 和 1 之间的随机数
+                    adjacency_matrix[i, j] = np.random.rand()
 
-    # 添加有向边并确保无环
-    else:
+    else: ## for contemporaneous causal, B is upper triangular to avoid cycle
         for i in range(num_nodes):
             for j in range(i + 1, num_nodes):
                 if np.random.rand() < edge_probability:
-                    dag.add_edge(i, j, weight=np.random.rand())  # 边的权重为介于 0 和 1 之间的随机数
+                    adjacency_matrix[i, j] = np.random.rand()
 
-
-    # 生成邻接矩阵
-    adjacency_matrix = np.zeros((len(dag.nodes), len(dag.nodes)))
-
-    for (i, j, weight) in dag.edges(data='weight'):
-        adjacency_matrix[i, j] = weight
-
-    edges = dict()
+    edge_shape=np.zeros(shape=(num_nodes,num_nodes,1), dtype='<U3')
     for i in range(adjacency_matrix.shape[0]):
         for j in range(adjacency_matrix.shape[1]):
             if adjacency_matrix[i, j] != 0:
-                edges[(j,i)]=adjacency_matrix[i, j]
+                edge_shape[i,j,0]="-->"
+                if not lagged_causal:
+                    edge_shape[j,i,0]="<--"
+    if lagged_causal:
+        edge_shape_2=np.zeros(shape=(num_nodes, num_nodes, 2), dtype='<U3')
+        edge_shape_2[:,:,[1]]=edge_shape
+        edge_shape=edge_shape_2
 
-    return dag,adjacency_matrix,edges
+
+    return adjacency_matrix,edge_shape
 
 
 def generate_dag_two_tails(num_nodes,edge_probability):
     
-    # 生成有向无环图 (DAG)
-    dag = nx.DiGraph()
 
-    # 添加节点
-    uppers=[f"{i}.u" for i in range(num_nodes)]
-    lowers=[f"{i}.l" for i in range(num_nodes)]
-
-    variables=uppers+lowers
-    dag.add_nodes_from(variables)#+switch)
-
+    adjacency_matrix = np.zeros((num_nodes*2,num_nodes*2))
     # 添加有向边并确保无环
     for i in range(2*num_nodes):
         for j in range(i + 1, 2*num_nodes):
-            if i!=j- num_nodes and np.random.rand() < edge_probability:
-                dag.add_edge(variables[i], variables[j], weight=np.random.rand()*2)  # 边的权重为介于 0 和 1 之间的随机数
+            if  np.random.rand() < edge_probability:
+                adjacency_matrix[i, j] = np.random.rand()
 
-    # for i in range(num_nodes):
-    #     dag.add_edge(uppers[i],switch[i],weight=1)
-    #     dag.add_edge(lowers[i],switch[i],weight=1)
-    # 生成邻接矩阵
-    adjacency_matrix = np.zeros((len(dag.nodes), len(dag.nodes)))
-    nodes=list(dag.nodes)
-    for (i, j, weight) in dag.edges(data='weight'):
-        i_index=nodes.index(i)
-        j_index=nodes.index(j)
-        adjacency_matrix[i_index, j_index] = weight
 
-    edges = dict()
+    edge_shape=np.zeros(shape=(num_nodes*2,num_nodes*2,1), dtype='<U3')
+
     for i in range(adjacency_matrix.shape[0]):
         for j in range(adjacency_matrix.shape[1]):
             if adjacency_matrix[i, j] != 0:
-                edges[(nodes[j],nodes[i])]=adjacency_matrix[i, j]
+                edge_shape[i,j,0]="-->"
+                edge_shape[j,i,0]="<--"
 
-    return dag,adjacency_matrix,edges
+    return adjacency_matrix,edge_shape
 
 
 
@@ -656,15 +635,39 @@ def draw_graph(edge_shape,save_path=None,var_names=None):
     plt.show()
     
     
-def method_this_paper(data_df,quantile=1,threshold=0.01,tau_max=0,pc_alpha=0.01,tau_min=0,both_tail=False,nodes_number=0):
+
+'''
+Author: Angus
+Description:
+    This function applies the method described in the paper to the given data.
+    It transforms the data using the Frechet transformation, then applies the PCMCI algorithm
+    with TailParCorr as the conditional independence test to identify causal relationships.
+
+Input:
+    data_df: pd.DataFrame, the input data with variables as columns.
+    quantile: float, the quantile level for the TailParCorr test (default is 1).
+    tau_max: int, the maximum time lag to consider (default is 0).
+    pc_alpha: float, the significance level for the PCMCI algorithm (default is 0.01).
+    tau_min: int, the minimum time lag to consider (default is 0).
+    both_tail: bool, indicates whether to consider both tails in the TailParCorr test (default is False).
+    nodes_number: int, the number of nodes/variables in the data (default is 0).
+    contemp_collider_rule: str, the rule for handling contemporaneous colliders in PCMCI (default is "conservative").
+
+Output:
+    graph: np.array, the resulting graph from the PCMCI algorithm.
+    results_tail: dict, the detailed results from the PCMCI algorithm.
+'''
+
+
+def method_this_paper(data_df,quantile=1,tau_max=0,pc_alpha=0.01,tau_min=0,both_tail=False,nodes_number=0,contemp_collider_rule="conservative"):
     data_df_=data_df.apply(tranform_frechet,axis=0,raw=True)
     dataframeRvier=pp.DataFrame(data_df_.values,var_names=data_df_.columns)
-    tailparcorr = TailParCorr(quantile,threshold=threshold,both_tail=both_tail,variable_num=nodes_number)
+    tailparcorr = TailParCorr(quantile,both_tail=both_tail,variable_num=nodes_number)
     pcmci_parcorr = PCMCI(
         dataframe=dataframeRvier, 
         cond_ind_test=tailparcorr,
         verbosity=0)
-    results_tail = pcmci_parcorr.run_pcmciplus(tau_max=tau_max, tau_min=tau_min,pc_alpha=pc_alpha,contemp_collider_rule="conservative")#
+    results_tail = pcmci_parcorr.run_pcmciplus(tau_max=tau_max, tau_min=tau_min,pc_alpha=pc_alpha,contemp_collider_rule=contemp_collider_rule)#
     return results_tail["graph"],results_tail
 
 
