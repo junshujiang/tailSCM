@@ -163,28 +163,12 @@ def estimate_tpdm1(array1:np.array,array2:np.array=None,quantile=10,unit_frechet
 
 
 
-def simulation(A_star,n,alpha=2):
-    ''' 
-    Author: Angus
-    A: Observed*Latent  对于每一个数据，其由列向量组合而成。
-    A*: 经过调整的A，确保unit scale for each tail
-    
-    '''
-    A_star=A_star.T
-    
-    if (A_star>0).all():
-        latents=np.random.uniform(0,1,size=(n,A_star.shape[0]))
-        ferchet=np.power(1-latents,-1/alpha)
-        data=ferchet@A_star
-        return data
-    else:
-        assert (A_star>0).any(axis=1).all()
-        A_star_here=A_star.copy()
-        A_star_here[A_star_here<0]=0
-        latents=np.random.uniform(0,1,size=(n,A_star.shape[0]))
-        ferchet=np.power(1-latents,-1/alpha)
-        data=ferchet@A_star
-        return data
+
+def simulation(n,d,alpha=2):
+    latents=np.random.uniform(0,1,size=(n,np.eye(d) .shape[0]))
+    ferchet=np.power(1-latents,-1/alpha)
+    return ferchet
+
 
 
 
@@ -455,7 +439,7 @@ def tranform_frechet(array:np.ndarray):
     return ferchet
 
 
-# refers Cooley and Thibaud (2019)
+# refers Cooley and Thibaud (2019), a function to transform the data to the (0,\infty) 
 def transform_softplus(array:np.ndarray,reverse:bool=False):
     if reverse:
         array_=np.log(np.exp(array)-1)
@@ -469,16 +453,23 @@ def otimes(coeffientMatrix,Data,back=True):
     # Data q*n
     coeffientMatrix_=coeffientMatrix
     coeffientMatrix_[coeffientMatrix_<=0]=0
-    if back:
-        return transform_softplus(coeffientMatrix_@transform_softplus(Data,False))
+
+    data_at_origin_scale=transform_softplus(Data, True)
+    if coeffientMatrix_.ndim == 3 :
+        data= np.einsum('ijk,ki->ji', coeffientMatrix_, data_at_origin_scale)
     else:
-        return coeffientMatrix_@transform_softplus(Data,False)
+        data=coeffientMatrix_@data_at_origin_scale
+    if back:
+        return data
+    else:
+        return transform_softplus(data,True)
 
 def oplus(Data1,Data2,back=True):
+    result=transform_softplus(Data1,True)+transform_softplus(Data2,True)
     if back:
-        return transform_softplus(transform_softplus(Data1,False)+transform_softplus(Data2,False))
+        return result
     else:
-        return transform_softplus(Data1,False)+transform_softplus(Data2,False)
+        return transform_softplus(result)
 
 
 def A_to_A_star_plus_minus(A):
