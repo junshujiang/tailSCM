@@ -462,7 +462,7 @@ def otimes(coeffientMatrix,Data,back=True):
     if back:
         return data
     else:
-        return transform_softplus(data,True)
+        return transform_softplus(data)
 
 def oplus(Data1,Data2,back=True):
     result=transform_softplus(Data1,True)+transform_softplus(Data2,True)
