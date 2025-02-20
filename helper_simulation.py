@@ -209,10 +209,9 @@ class TailParCorr(CondIndTest):
         """
         return self._measure
 
-    def __init__(self,tail_quantile=5,both_tail=False,variable_num=None,threshold=None,**kwargs):
+    def __init__(self,tail_quantile=5,both_tail=False,variable_num=None,**kwargs):
         self._measure = 'Tailpar_corr'
         self.two_sided = True
-        self.threshold=threshold
         self.residual_based = True
         self.tail_quantile=tail_quantile
         self.both_tail=both_tail
@@ -318,9 +317,7 @@ class TailParCorr(CondIndTest):
             residuals=Y-linear_transformation(X,b) 
         coeff,tau2=estimate_tpdm1(residuals,quantile=self.tail_quantile,unit_frechet=False,include_var=True)
         coeff=coeff[0,1]
-        if self.threshold is not None:
-            if abs(coeff)<self.threshold:
-                coeff=0
+
             
         
         deg_f = int(array.shape[1]*self.tail_quantile/100) - (array.shape[0])
@@ -561,9 +558,9 @@ def generate_dag(num_nodes, edge_probability=0.3,lagged_causal=False):
     for i in range(adjacency_matrix.shape[0]):
         for j in range(adjacency_matrix.shape[1]):
             if adjacency_matrix[i, j] != 0:
-                edge_shape[i,j,0]="-->"
+                edge_shape[j,i,0]="-->"
                 if not lagged_causal:
-                    edge_shape[j,i,0]="<--"
+                    edge_shape[i,j,0]="<--"
     if lagged_causal:
         edge_shape_2=np.zeros(shape=(num_nodes, num_nodes, 2), dtype='<U3')
         edge_shape_2[:,:,[1]]=edge_shape
@@ -589,41 +586,102 @@ def generate_dag_two_tails(num_nodes,edge_probability):
     for i in range(adjacency_matrix.shape[0]):
         for j in range(adjacency_matrix.shape[1]):
             if adjacency_matrix[i, j] != 0:
-                edge_shape[i,j,0]="-->"
-                edge_shape[j,i,0]="<--"
+                edge_shape[i,j,0]="<--"
+                edge_shape[j,i,0]="-->"
 
     return adjacency_matrix,edge_shape
 
 
+'''
+Author: Angus
+Description:
+    This function is used to draw a graph based on the provided edge shape matrix. 
+    It utilizes the tigramite plotting library's tp.plot_graph function to visualize the graph and can save the plot to a specified path.
+
+Input: 
+    edge_shape: np.array, the edge shape matrix representing the direction of edges.
+    save_path: str, optional, the path where the graph image will be saved. If None, the graph will be displayed.
+    **kwargs: additional keyword arguments for customization of the graph appearance.
+
+Output:
+    None. The function either saves the graph to a file or displays it.
+'''
 
 
-def draw_graph(edge_shape,save_path=None,var_names=None):
+
+def draw_graph(edge_shape,save_path=None,**kwargs):
     edge_value=np.ones_like(edge_shape,dtype=float)
     tp.plot_graph(
-        val_matrix=edge_value,#[userful,][:,userful],
-        #link_width = np.abs(edge_value),
-        graph=edge_shape,#[userful,][:,userful],
-        var_names=var_names,
-        #label_fontsize=10,
-        arrow_linewidth=3,
-        arrowhead_size=5,
-        #node_pos=position_dict,
-        #vmin_edges=0,
-        #vmax_edges=1,
-        #node_size=50,
-        label_fontsize=20,
-        #curved_radius=1,
-        #link_label_fontsize=10000,
-        figsize=(5,5),
+        val_matrix=edge_value,
+        graph=edge_shape,
         cmap_edges =cm1,
         cmap_nodes =cm2,
-        #node_ticks =50,
         link_colorbar_label='TailCorr',
         save_name=save_path,##
-        show_colorbar=False 
+        show_colorbar=False,
+        **kwargs
         )
-    #plt.savefig(os.path.join(log_path,f"estimation_river_pc_alpha[rule{rule}].png"),bbox_inches='tight',dpi=200,  pad_inches=0)
-    plt.show()
+    if save_path is not None:
+        plt.savefig(save_path,dpi=200,  pad_inches=0)
+    else:
+        plt.show()
+
+'''
+Author: Angus
+Description:
+    This function is used to draw a time series graph based on the provided edge shape matrix. 
+    It utilizes the tigramite plotting library's tp.plot_time_series_graph function to visualize the graph and can save the plot to a specified path.
+
+Input: 
+    edge_shape: np.array, the edge shape matrix representing the direction of edges.
+    save_path: str, optional, the path where the graph image will be saved. If None, the graph will be displayed.
+    **kwargs: additional keyword arguments for customization of the graph appearance.
+
+Output:
+    None. The function either saves the graph to a file or displays it.
+'''
+def draw_graph_timeseries(edge_shape,save_path=None,**kwargs):
+
+    edge_value=np.ones_like(edge_shape,dtype=float)
+    tp.plot_time_series_graph(
+        val_matrix=edge_value,
+        graph=edge_shape,
+        save_name=save_path,##
+        **kwargs
+        )
+    if save_path is not None:
+        plt.savefig(save_path,dpi=200,  pad_inches=0)
+    else:
+        plt.show()
+
+
+# def draw_graph(edge_shape,save_path=None,var_names=None,position_dict=None):
+#     edge_value=np.ones_like(edge_shape,dtype=float)
+#     tp.plot_graph(
+#         val_matrix=edge_value,#[userful,][:,userful],
+#         #link_width = np.abs(edge_value),
+#         graph=edge_shape,#[userful,][:,userful],
+#         var_names=var_names,
+#         #label_fontsize=10,
+#         arrow_linewidth=3,
+#         arrowhead_size=5,
+#         node_pos=position_dict,
+#         #vmin_edges=0,
+#         #vmax_edges=1,
+#         #node_size=50,
+#         label_fontsize=20,
+#         #curved_radius=1,
+#         #link_label_fontsize=10000,
+#         figsize=(5,5),
+#         cmap_edges =cm1,
+#         cmap_nodes =cm2,
+#         #node_ticks =50,
+#         link_colorbar_label='TailCorr',
+#         save_name=save_path,##
+#         show_colorbar=False 
+#         )
+#     #plt.savefig(os.path.join(log_path,f"estimation_river_pc_alpha[rule{rule}].png"),bbox_inches='tight',dpi=200,  pad_inches=0)
+#     plt.show()
     
     
 
@@ -669,6 +727,7 @@ Author: Angus
 Description:
     This function compares two graphs and calculates the degree of mismatch between them.
     It returns the proportion of mismatched edges and the total number of mismatches.
+    It ignore the direction of the edges.
 
 Input:
     graph1: np.array, the first graph represented as an adjacency matrix.
@@ -698,6 +757,24 @@ def compare_graphs(graph1,graph2,lagged=False):
     return mismatch/totalEdges,mismatch
 
 
+
+''' 
+
+
+'''
+def compare_timeseries_graphs(results,edges_matrix,exclude_contemp=True,exclude_self=True):
+    result_here=results.copy()
+    group_truth_here=edges_matrix.copy()
+    if exclude_contemp:
+        group_truth_here[:,:,0 ]=""
+        result_here[:,:,0 ]=""
+    if exclude_self:
+        mask = np.eye(group_truth_here.shape[0], dtype=bool)
+
+        mask_3d = np.repeat(mask[:, :, np.newaxis], 2, axis=2)
+        group_truth_here[mask_3d]=""
+        result_here[mask_3d]=""
+    return compare_graphs(result_here,group_truth_here,True)
 
 
 # 使用 linspace 生成 0 到 1 的等间距值

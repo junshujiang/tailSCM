@@ -55,7 +55,7 @@ if __name__=="__main__":
             X_data=oplus(otimes(adjacency_matrix,N_data[:,:-1],False),N_data[:,1:],False).T
 
 
-            resultsThisPaper,_=method_this_paper(pd.DataFrame(X_data),tau_max=1,tau_min=1)
+            resultsThisPaper,_=method_this_paper(pd.DataFrame(X_data),tau_max=1,tau_min=1,quantile=quantile,pc_alpha=pc_alpha)
             resultBodik=ComparisonBodik(pd.DataFrame(X_data),1)
 
             # 创建一个 [N, N] 的对角线掩码
