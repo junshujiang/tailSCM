@@ -9,6 +9,10 @@ from tigramite.independence_tests import CondIndTest
 from matplotlib.colors import LinearSegmentedColormap
 from scipy import stats
 import mkl
+import rpy2.robjects as robjects
+from rpy2.robjects import pandas2ri, numpy2ri
+from rpy2.robjects import r
+numpy2ri.activate()
 mkl.set_num_threads(1)
 import os 
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -570,6 +574,46 @@ def generate_dag(num_nodes, edge_probability=0.3,lagged_causal=False):
     return adjacency_matrix,edge_shape
 
 
+'''
+Author: ANgus
+Description:
+    This function generates a time series of Directed Acyclic Graphs (DAGs) with both contemporaneous and lagged causal relationships.
+    The function first generates a contemporaneous adjacency matrix and its corresponding ground truth graph.
+    Then, it generates lagged adjacency matrices and their corresponding ground truth graphs for each lag up to tau.
+    Finally, it stacks the contemporaneous and lagged adjacency matrices and ground truth graphs into 3D arrays.
+Parameters:
+    num_nodes (int): Number of nodes in the graph.
+    sparsity_lag (float): Sparsity level for the lagged causal relationships.
+    sparsity_contemp (float): Sparsity level for the contemporaneous causal relationships.
+    tau (int): Number of lags to consider.
+Returns:
+    tuple: A tuple containing the stacked adjacency matrix and the stacked ground truth graph.
+'''
+
+
+def generate_dag_timeseries(num_nodes,sparsity_lag,sparsity_contemp,tau):
+
+    adjacency_matrix_contemp,ground_true_graph_contemp = generate_dag(num_nodes,edge_probability=sparsity_contemp,lagged_causal=False)
+
+
+    adjacency_matrix_laggeds,ground_true_graph_laggeds=[],[]
+    for i in range(tau):
+        adjacency_matrix_lagged,ground_true_graph_lagged = generate_dag(num_nodes,edge_probability=sparsity_lag,lagged_causal=True)
+        adjacency_matrix_laggeds.append(adjacency_matrix_lagged)
+        ground_true_graph_laggeds.append(ground_true_graph_lagged)
+
+    true_graph=np.zeros(shape=(num_nodes,num_nodes,tau+1), dtype='<U3')
+    true_graph[:,:,0]=ground_true_graph_contemp[:,:,0]
+    for i in range(tau):
+        true_graph[:,:,i+1]=ground_true_graph_laggeds[i][:,:,1]
+
+
+    adjacency_matrix=np.stack([adjacency_matrix_contemp]+adjacency_matrix_laggeds,axis=2)
+
+    true_graph=np.concatenate([ground_true_graph_contemp,ground_true_graph_laggeds[0]],axis=2)
+    return adjacency_matrix,true_graph
+
+
 def generate_dag_two_tails(num_nodes,edge_probability):
     
 
@@ -793,3 +837,26 @@ def custom_linspace(start, stop, num, alpha=1.0):
 
     result = start + (stop - start) * (transformed_space - transformed_space.min()) / (transformed_space.max() - transformed_space.min())
     return result
+
+
+
+
+def extremeogram(data,quantile=0.99,maxlag=20,start=0):
+    """
+    Compute the extremeogram.
+
+    Parameters:
+    data (ndarray): Input data matrix （n*2).
+    quantile (float): Quantile threshold, default is 0.99.
+    maxlag (int): Maximum lag value, default is 20.
+    start (int): Starting point, default is 0.
+
+    Returns:
+    R object: Result of the extremeogram.
+    """
+    x_r = r.matrix(data, nrow=data.shape[0], ncol=data.shape[1])
+    robjects.globalenv['x'] = x_r 
+    return robjects.r(f"""
+        library(extremogram)
+        extremogram2(x,{quantile},{quantile}, {maxlag}, type=1, start = {start})
+    """)
