@@ -614,26 +614,53 @@ def generate_dag_timeseries(num_nodes,sparsity_lag,sparsity_contemp,tau):
     return adjacency_matrix,true_graph
 
 
-def generate_dag_two_tails(num_nodes,edge_probability):
-    
+def generate_dag_two_tails(num_nodes, edge_probability):
+    """Generates a DAG with two tails.
 
-    adjacency_matrix = np.zeros((num_nodes*2,num_nodes*2))
+    Args:
+        num_nodes (int): Number of nodes in one tail.
+        edge_probability (float): Probability of edge creation between nodes.
+
+    Returns:
+        tuple: A tuple containing the adjacency matrix and edge shape matrix.
+    """
+    
+    adjacency_matrix = np.zeros((num_nodes*2, num_nodes*2))
     # 添加有向边并确保无环
     for i in range(2*num_nodes):
         for j in range(i + 1, 2*num_nodes):
-            if  np.random.rand() < edge_probability:
+            if j == i + num_nodes:  # no edge between u and l
+                continue
+            if np.random.rand() < edge_probability:
                 adjacency_matrix[i, j] = np.random.rand()
 
-
-    edge_shape=np.zeros(shape=(num_nodes*2,num_nodes*2,1), dtype='<U3')
+    edge_shape = np.zeros(shape=(num_nodes*2, num_nodes*2, 1), dtype='<U3')
 
     for i in range(adjacency_matrix.shape[0]):
         for j in range(adjacency_matrix.shape[1]):
             if adjacency_matrix[i, j] != 0:
-                edge_shape[i,j,0]="<--"
-                edge_shape[j,i,0]="-->"
+                edge_shape[i, j, 0] = "<--"
+                edge_shape[j, i, 0] = "-->"
 
-    return adjacency_matrix,edge_shape
+    return adjacency_matrix, edge_shape
+
+
+''' 
+This function sorts the edge shape and variable names for a graph with two tails.
+It rearranges the nodes such that the first half of the nodes are followed by their corresponding second half nodes.
+
+useage:
+    draw_graph(arrow_linewidth=3,arrowhead_size=5,label_fontsize=20,figsize=(5,5),**sort_name_and_edge(edge_shape,var_names))
+'''
+def sort_name_and_edge(edge_shape,var_names):
+    num_nodes=edge_shape.shape[0]//2
+
+    orders=[]
+    for i in range(num_nodes):
+        orders.append(i)
+        orders.append(i+num_nodes)
+    orders=np.array(orders)
+    return {"edge_shape":edge_shape[orders[:, None], orders[None, :], :],"var_names":var_names[orders]}
 
 
 '''
@@ -909,6 +936,69 @@ def simulation_timeseries(T, burn_in, adjacency_matrix):
     # Convert the final time series data to DataFrame format and return
     data_df = pd.DataFrame(np.array(X_data_list[-T:]))
     return data_df
+
+
+
+def simulation_both_tail_cross_section(N,adjacency_matrix,A=None,switch_probability=None):
+    """
+    Generates simulated cross-sectional data for both upper and lower tail scenarios.
+    
+    Args:
+        N (int): Number of observational samples
+        adjacency_matrix (np.ndarray): Adjacency matrix of the causal graph (shape 2n x 2n) upper triangular matrix and no link between u and l
+        switch_probability (np.ndarray): Array of switching probabilities between upper/lower tails for each node
+        
+    Returns:
+        pd.DataFrame: Simulated data matrix with shape (N, num_nodes) containing tail-adjusted observations
+    
+    Description:
+        Constructs upper/lower tail variables through a switching mechanism using:
+        1. Base noise simulation
+        2. Diagonal switching matrix construction
+        3. Structural equation model computation
+        4. Softplus transformation for tail separation
+    """
+
+
+
+    num_nodes = adjacency_matrix.shape[0] // 2
+
+    A=np.diag(np.ones(num_nodes))
+    A=np.concatenate([A,A],axis=0)
+    switch_probability=np.ones(num_nodes)*0.5
+
+    assert is_upper_triangular(adjacency_matrix[:, :])
+    assert np.all(adjacency_matrix[np.arange(num_nodes), np.arange(num_nodes) + num_nodes] == 0)
+
+
+    N_data=simulation(N,num_nodes).T
+    K_data=(np.random.uniform(0,1,size=(N,num_nodes))>switch_probability).astype(int)
+    K_data_=np.concatenate([K_data,1-K_data],axis=1)
+
+    K_data=np.array([np.diag(k) for k in K_data_])
+
+    # Core computation
+    I = np.diag(np.ones(num_nodes * 2))
+    KA = K_data @ A
+    KB = K_data @ adjacency_matrix
+    IKB_inv=np.linalg.inv(I-KB)
+    X_data_bar=otimes(IKB_inv @ KA,N_data,False)
+    X_data_bar_=transform_softplus(X_data_bar,True)
+    X_data=X_data_bar_[:num_nodes,:]-X_data_bar_[num_nodes:,:]
+
+    data_df=pd.DataFrame(X_data.T)
+    return data_df
+
+
+
+# Function to expand the data frame by separating upper and lower tails
+
+def expand_data_df(data_df):
+    upper_tails = np.where(data_df.values > 0, data_df.values, 0)
+    lower_tails = np.where(data_df.values < 0, -data_df.values, 0)
+    X_bar = np.concatenate([upper_tails, lower_tails], axis=1)
+    data_df_bar=pd.DataFrame(X_bar,columns=[f"{x}.u" for x in data_df.columns]+[f"{x}.l" for x in data_df.columns])
+    return data_df_bar
 
 
 def compute_spectral_radius(adjacency_matrix):

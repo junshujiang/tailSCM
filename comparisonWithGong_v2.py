@@ -1,16 +1,18 @@
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pickle
 import os
 import pickle
 from helper_simulation import *
+from itertools import product
 from helper_util import *
-import rpy2.robjects as robjects
-from rpy2.robjects import pandas2ri,numpy2ri
-from rpy2.robjects.conversion import localconverter
 import numpy as np
 import pandas as pd
-from comparison import ComparisonGong, ComparisonBodik
+from comparison import ComparisonGong
 import numpy as np
 from helper_simulation import *
-
+from datetime import datetime
+current_date = datetime.now().strftime("%Y%m%d")
 
 if __name__ == '__main__':
     ## PARAMS for test
@@ -31,17 +33,20 @@ if __name__ == '__main__':
     ## auto-tuning
 
 
+
     max_id=get_max("exp_result")
     exp_str=""
-    log_path=f"exp_result/{str(max_id)}.ComparisonGong.log"
+    log_path=f"exp_result/{str(max_id)}.{current_date}.ComparisonGong.log"
 
     logger=get_logger(log_path)
     alpha_can = 10**np.linspace(-2, 0, 10)
     beta_can = 10**np.linspace(-3, 1, 10)
 
-    from itertools import product
+    logger.info(f"pc_alpha: {pc_alpha}")
+    logger.info(f"quantile: {quantile}")
+
     params = list(product(alpha_can, beta_can))
-    import numpy as np
+
 
     results={}
     for config_i, nodes_number in enumerate(comparison_nodes):
@@ -119,3 +124,35 @@ if __name__ == '__main__':
     logger.info(f"Results saved to {os.path.join(log_path,'GONGComparison.csv')}")
 
 
+
+
+
+    ## Draw
+    results = pd.concat(results_ori)
+
+    df = pd.DataFrame()
+    df["values"] = np.concatenate([results.values[:, 0], results.values[:, 1]])
+    df["model"] = (['This work'] * results.shape[0] + ['method 1'] * results.shape[0])
+    settings = [f"({node}, {sparcity})" for node, sparcity in zip(comparison_nodes, sparcitys)]
+    models = []
+
+    for s in settings:
+        models.extend([s] * comparison_number)
+    df["experiment"] = models * 2
+
+    # Draw grouped boxplot
+    custom_palette = ['#1f77b4', 'orange']  # First is blue, second is orange
+    sns.boxplot(x='experiment', y='values', hue='model', data=df, palette=custom_palette)
+    plt.ylim(-0.01, 1)
+    # Add title
+    # plt.title('Comparison of Two Models Across Experiments')
+
+    plt.legend(title='', loc='upper right', prop={'size': 16})
+    # Set x-axis and y-axis labels, supporting LaTeX characters
+    plt.xlabel(r'', fontsize=18)  # Set x-axis label
+    plt.ylabel(r'', fontsize=18)  # Set y-axis label
+    plt.xticks(fontsize=13)  # Set x-axis tick label font size
+    plt.yticks(fontsize=13)  # Set y-axis tick label font size
+    # Display the plot
+    plt.tight_layout()
+    plt.savefig(os.path.join(log_path, "GONGComparison.png"))

@@ -1,3 +1,4 @@
+import seaborn as sns
 import os
 import pickle
 from helper_simulation import *
@@ -8,13 +9,14 @@ import pandas as pd
 from comparison import ComparisonBodik
 import numpy as np
 from helper_simulation import *
-
+from datetime import datetime
+current_date = datetime.now().strftime("%Y%m%d")
 
 
 if __name__=="__main__":
 
     ## PARAMS for test
-    comparison_number=5
+    comparison_number=50
     comparison_nodes=np.array([5,9,15,35,50])
     sparcitys=np.array([0.4,0.2,0.1,0.04,0.03])
     close_contemp=True
@@ -34,7 +36,7 @@ if __name__=="__main__":
 
     max_id=get_max("exp_result")
     exp_str=""
-    log_path=f"exp_result/{str(max_id)}.ComparisonBodik.log"
+    log_path=f"exp_result/{str(max_id)}.{current_date}.ComparisonBodik.log"
 
     logger=get_logger(log_path)
 
@@ -108,3 +110,35 @@ if __name__=="__main__":
     df_result.to_csv(os.path.join(log_path,"BODIKComparison.csv"))
     logger.info(f"Results saved to {os.path.join(log_path,'BODIKComparison.csv')}")
 
+
+
+
+    ## Draw
+    results = pd.concat(results_ori)
+
+    df = pd.DataFrame()
+    df["values"] = np.concatenate([results.values[:, 0], results.values[:, 1]])
+    df["model"] = (['This work'] * results.shape[0] + ['method 2'] * results.shape[0])
+    settings = [f"({node}, {sparcity})" for node, sparcity in zip(comparison_nodes, sparcitys)]
+    models = []
+
+    for s in settings:
+        models.extend([s] * comparison_number)
+    df["experiment"] = models * 2
+
+    # Draw grouped boxplot
+    custom_palette = ['#1f77b4', 'green']  # First is blue, second is orange
+    sns.boxplot(x='experiment', y='values', hue='model', data=df, palette=custom_palette)
+    plt.ylim(-0.01, 1)
+    # Add title
+    # plt.title('Comparison of Two Models Across Experiments')
+
+    plt.legend(title='', loc='upper right', prop={'size': 16})
+    # Set x-axis and y-axis labels, supporting LaTeX characters
+    plt.xlabel(r'', fontsize=18)  # Set x-axis label
+    plt.ylabel(r'', fontsize=18)  # Set y-axis label
+    plt.xticks(fontsize=13)  # Set x-axis tick label font size
+    plt.yticks(fontsize=13)  # Set y-axis tick label font size
+    # Display the plot
+    plt.tight_layout()
+    plt.savefig(os.path.join(log_path, "BodikComparison.png"))
