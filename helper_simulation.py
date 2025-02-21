@@ -610,7 +610,7 @@ def generate_dag_timeseries(num_nodes,sparsity_lag,sparsity_contemp,tau):
 
     adjacency_matrix=np.stack([adjacency_matrix_contemp]+adjacency_matrix_laggeds,axis=2)
 
-    true_graph=np.concatenate([ground_true_graph_contemp,ground_true_graph_laggeds[0]],axis=2)
+
     return adjacency_matrix,true_graph
 
 
@@ -860,3 +860,91 @@ def extremeogram(data,quantile=0.99,maxlag=20,start=0):
         library(extremogram)
         extremogram2(x,{quantile},{quantile}, {maxlag}, type=1, start = {start})
     """)
+
+
+# Check if a matrix is upper triangular
+def is_upper_triangular(matrix):
+    return np.allclose(matrix, np.triu(matrix))
+
+
+# This function simulates a time series based on the given parameters and adjacency matrix.
+# It checks if the adjacency matrix is upper triangular, calculates the number of lags,
+# generates simulated data, and processes it to produce a DataFrame of the time series.
+
+def simulation_timeseries(T, burn_in, num_nodes, adjacency_matrix):
+    # Check if the first slice of the input adjacency matrix is upper triangular
+    assert is_upper_triangular(adjacency_matrix[:, :, 0])
+    # Calculate the number of lags, tau
+    tau = adjacency_matrix.shape[2] - 1
+
+    # Generate simulated data with a time series length of T + tau + burn_in
+    N_data = simulation(T + tau + burn_in, num_nodes).T
+
+    # Calculate the initial condition matrix IC_0
+    IC_0 = np.linalg.inv(np.eye(adjacency_matrix.shape[0]) - adjacency_matrix[:, :, 0])
+    # Initialize the IC_1 list to store matrices for each lag
+    IC_1_lists = []
+    for i in range(tau):
+        # Compute the matrix for each lag and add it to the list
+        IC_1_lists.append(IC_0 @ adjacency_matrix[:, :, 1 + i])
+
+    # Initialize the data list X_data_list
+    X_data_list = []
+
+    # Add the data for the first tau time points to X_data_list
+    for i in range(tau):
+        X_data_list.append(N_data[:, i])
+
+    # Starting from the tau-th time point, compute the result for each time point and add it to X_data_list
+    for i in range(tau, T + tau + burn_in):
+        # Compute the result for the current time point
+        results = otimes(IC_0, N_data[:, i], False)
+        for j in range(tau):
+            # Incorporate the effect of lags
+            results = oplus(results, otimes(IC_1_lists[j], X_data_list[-j - 1], False), False)
+
+        # Add the result to the data list
+        X_data_list.append(results)
+
+    # Convert the final time series data to DataFrame format and return
+    data_df = pd.DataFrame(np.array(X_data_list[-T:]))
+    return data_df
+
+
+def compute_spectral_radius(adjacency_matrix):
+    """
+    Calculate the spectral radius of the state transition matrix for given VAR(d) coefficient matrices A_1, A_2, ..., A_d.
+    
+    Parameters:
+    A_list (list of numpy.ndarray): Contains d VAR coefficient matrices of dimension p×p.
+    
+    Returns:
+    spectral_radius (float): The spectral radius of the state transition matrix.
+    """
+
+    IC_0 = np.linalg.inv(np.eye(adjacency_matrix.shape[0]) - adjacency_matrix[:, :, 0])
+    # Initialize the IC_1 list to store matrices for each lag
+    IC_1_lists = []
+    tau=adjacency_matrix.shape[2]-1
+    for i in range(tau):
+        # Compute the matrix for each lag and add it to the list
+        IC_1_lists.append(IC_0 @ adjacency_matrix[:, :, 1 + i])
+
+    A_list = IC_1_lists
+
+    p = A_list[0].shape[0]  # Dimension of variables
+    d = len(A_list)  # Order of lags
+
+    # Construct the state transition matrix
+    top_row = np.hstack(A_list)  # Concatenate A_1, A_2, ..., A_d
+    identity_blocks = np.eye(p * (d - 1))  # Generate I_p blocks
+    zero_blocks = np.zeros((p * (d - 1), p))  # Generate zero matrix
+    bottom_rows = np.hstack([identity_blocks, zero_blocks])  # Combine I_p and zero matrix
+    
+    # Form the final state transition matrix A_big
+    A_big = np.vstack([top_row, bottom_rows])
+    # Calculate eigenvalues and take the maximum modulus
+    eigvals = np.linalg.eigvals(A_big)
+    spectral_radius = max(abs(eigvals))
+
+    return spectral_radius
