@@ -2,12 +2,10 @@ import os
 import pickle
 from helper_simulation import *
 from helper_util import *
-import rpy2.robjects as robjects
-from rpy2.robjects import pandas2ri,numpy2ri
-from rpy2.robjects.conversion import localconverter
+
 import numpy as np
 import pandas as pd
-from comparison import ComparisonGong, ComparisonBodik
+from comparison import ComparisonBodik
 import numpy as np
 from helper_simulation import *
 
@@ -16,12 +14,15 @@ from helper_simulation import *
 if __name__=="__main__":
 
     ## PARAMS for test
-    comparison_number=50
+    comparison_number=5
     comparison_nodes=np.array([5,9,15,35,50])
     sparcitys=np.array([0.4,0.2,0.1,0.04,0.03])
+    close_contemp=True
 
 
-    numeberOfData=5000
+    numeberOfLength=5000
+    burn_in=1000
+    tau=1
 
 
 
@@ -36,7 +37,18 @@ if __name__=="__main__":
     log_path=f"exp_result/{str(max_id)}.ComparisonBodik.log"
 
     logger=get_logger(log_path)
-    logger.info(f"Start test for {comparison_nodes} nodes, Sparcity {sparcitys}")
+
+
+    logger.info(f"comparison_number: {comparison_number}")
+    logger.info(f"comparison_nodes: {np.array2string(comparison_nodes, separator=', ')}")
+    logger.info(f"sparcitys: {np.array2string(sparcitys, separator=', ')}")
+    logger.info(f"close_contemp: {str(close_contemp)}")
+    logger.info(f"numeberOfLength: {numeberOfLength}")
+    logger.info(f"burn_in: {burn_in}")
+    logger.info(f"tau: {tau}")
+    logger.info(f"pc_alpha: {pc_alpha}")
+    logger.info(f"quantile: {quantile}")
+
 
     results={}
     for config_i, nodes_number in enumerate(comparison_nodes):
@@ -49,31 +61,29 @@ if __name__=="__main__":
         test_number=0
         while (test_number<comparison_number):
             logger.info(f"Test {test_number}")
+            contemp_sparsity= 0 if close_contemp else sparcity
+            adjacency_matrix,true_graph=generate_dag_timeseries(nodes_number,sparcity,contemp_sparsity,tau)
+            spectral_radius=compute_spectral_radius(adjacency_matrix)
+            logger.info(f"The spectral radius is {spectral_radius}")
+            if spectral_radius>1:
+                adjacency_matrix=adjacency_matrix/(spectral_radius*1.1)
+                spectral_radius=compute_spectral_radius(adjacency_matrix)
+                logger.info(f"adjusted spectral radius is {spectral_radius}")
 
-            adjacency_matrix,ground_true_graph = generate_dag(nodes_number,edge_probability=sparcity,lagged_causal=True)
-            N_data=simulation(numeberOfData+1,nodes_number).T 
-            X_data=oplus(otimes(adjacency_matrix,N_data[:,:-1],False),N_data[:,1:],False).T
+            data_df=simulation_timeseries(numeberOfLength,burn_in,adjacency_matrix)
 
 
-            resultsThisPaper,_=method_this_paper(pd.DataFrame(X_data),tau_max=1,tau_min=1,quantile=quantile,pc_alpha=pc_alpha)
-            resultBodik=ComparisonBodik(pd.DataFrame(X_data),1)
+            resultsThisPaper,_=method_this_paper(data_df,tau_max=tau,tau_min=1 if close_contemp else 0,quantile=quantile,pc_alpha=pc_alpha)
+            resultBodik=ComparisonBodik(data_df,tau)
 
             # 创建一个 [N, N] 的对角线掩码
-            mask = np.eye(ground_true_graph.shape[0], dtype=bool)
+            error_rate_this_paper,error_edges_this_paper=compare_timeseries_graphs(resultsThisPaper,true_graph,exclude_contemp=True,exclude_self=True)
 
-            # 将掩码扩展为 [N, N, k] 的形状
-            # 利用广播机制，将掩码沿着第 3 维度（k 维度）扩展
-            mask_3d = np.repeat(mask[:, :, np.newaxis], 2, axis=2)
-
-            ground_true_graph_with_selfmask=ground_true_graph.copy()
-            ground_true_graph_with_selfmask[mask_3d]=""
-            resultsThisPaper_with_selfmask=resultsThisPaper.copy()
-            resultsThisPaper_with_selfmask[mask_3d]=""
-            resultBodik_with_selfmask=resultBodik.copy()
-            resultBodik_with_selfmask[mask_3d]=""
+            error_rate_bodik,error_edges_bodik=compare_timeseries_graphs(resultBodik,true_graph,exclude_contemp=True,exclude_self=True)
+            
+            result_this.append(error_rate_this_paper)
+            result_bodik.append(error_rate_bodik)
             test_number=test_number+1
-            result_this.append(compare_graphs(ground_true_graph_with_selfmask,resultsThisPaper_with_selfmask,lagged=True))
-            result_bodik.append(compare_graphs(ground_true_graph_with_selfmask,resultBodik_with_selfmask,lagged=True))
         results[config_i]["THIS"]=result_this
         results[config_i]["BODIK"]=result_bodik
         
@@ -81,8 +91,8 @@ if __name__=="__main__":
     results_df=[]
     results_ori=[]
     for config_i in results:
-        df_tmp_ori=pd.DataFrame({"THIS":[x[0] for x in results[config_i]["THIS"]],
-                "BODIK":[x[0] for x in results[config_i]["BODIK"]]})
+        df_tmp_ori=pd.DataFrame({"THIS":[x for x in results[config_i]["THIS"]],
+                "BODIK":[x for x in results[config_i]["BODIK"]]})
         results_ori.append(df_tmp_ori)
         mean=df_tmp_ori.mean()
         std=df_tmp_ori.std()
