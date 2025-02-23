@@ -1,3 +1,19 @@
+
+
+
+
+
+"""
+This file implements a comparison with Gong's method on non-time series simulated data. 
+It tests different settings and outputs the results as an error bar plot.
+Author: Angus
+"""
+
+
+
+
+
+
 import os
 import pickle
 from helper_simulation import *

@@ -1,3 +1,27 @@
+
+
+
+
+
+
+
+
+
+"""
+This file implements a comparison with Gong's method on non-time series simulated data. 
+It tests different settings and outputs the results as an error bar plot. 
+The parameters used in Gong's method for each setting are obtained based on grid search.
+Author: Angus
+"""
+
+
+
+
+
+
+
+
+
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pickle

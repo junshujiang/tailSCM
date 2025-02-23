@@ -1,3 +1,23 @@
+
+
+
+
+
+
+
+
+
+"""
+This file implements a comparison with Bodik's method on time series simulated data. 
+It tests different settings and outputs the results as an error bar plot.
+Author: Angus
+"""
+
+
+
+
+
+
 import seaborn as sns
 import os
 import pickle
@@ -19,7 +39,7 @@ if __name__=="__main__":
     comparison_number=50
     comparison_nodes=np.array([5,9,15,35,50])
     sparcitys=np.array([0.4,0.2,0.1,0.04,0.03])
-    close_contemp=True
+    close_contemp=False
 
 
     numeberOfLength=5000
