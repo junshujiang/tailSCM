@@ -170,7 +170,7 @@ if __name__=="__main__":
     futures_ins_tables=mata_info[[f"{key}_future" for key in most_active_options]].copy()
     futures_ins_tables.columns=[x.split("_")[0] for x in futures_ins_tables.columns]
 
-
+    mata_info.to_csv(os.path.join(log_str,"meta_info.csv"))
 
 
     # %% [markdown]
@@ -345,3 +345,7 @@ if __name__=="__main__":
     opt_fut_prices=opt_fut_prices[columns]
 
     opt_fut_prices.to_parquet(os.path.join(log_str,"opt_fut_iv_prices.parquet"))
+
+
+
+
