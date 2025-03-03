@@ -72,7 +72,7 @@ for config_i, nodes_number in enumerate(comparison_nodes):
 
     
 
-        resultsThisPaper,_=method_this_paper(data_df_bar,both_tail=True,nodes_number=nodes_number,pc_alpha=pc_alpha,quantile=quantile,tau_max=tau,tau_min=tau if close_contemp else 0)
+        resultsThisPaper,_=method_this_paper(data_df_bar,both_tail_variable=nodes_number,pc_alpha=pc_alpha,quantile=quantile,tau_max=tau,tau_min=tau if close_contemp else 0)
 
         error_rate_this_paper,_=compare_graphs(resultsThisPaper,true_graph)
         test_number=test_number+1

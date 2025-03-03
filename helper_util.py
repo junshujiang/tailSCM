@@ -81,6 +81,28 @@ def sort_name_and_edge(edge_shape,var_names):
     return {"edge_shape":edge_shape[orders[:, None], orders[None, :], :],"var_names":var_names[orders]}
 
 
+
+
+''' 
+This function sorts the edge shape and variable names for a graph with two tails.
+It rearranges the nodes such that the first half of the nodes are followed by their corresponding second half nodes.
+
+useage:
+    draw_graph(arrow_linewidth=3,arrowhead_size=5,label_fontsize=20,figsize=(5,5),**sort_name_and_edge(edge_shape,var_names))
+'''
+def sort_name_and_edge_price_volume(edge_shape,var_names):
+    num_nodes=edge_shape.shape[0]//3
+
+    orders=[]
+    for i in range(num_nodes):
+        orders.append(i)
+        orders.append(i+2*num_nodes)
+        orders.append(i+num_nodes)
+
+    orders=np.array(orders)
+    return {"edge_shape":edge_shape[orders[:, None], orders[None, :], :],"var_names":var_names[orders]}
+
+
 '''
 Author: Angus
 Description:
@@ -224,20 +246,265 @@ Output:
 '''
 
 
-def method_this_paper(data_df,quantile=1,tau_max=0,pc_alpha=0.01,tau_min=0,both_tail=False,contemp_collider_rule="conservative"):
-    if both_tail:
-        nodes_number=data_df.shape[1]//2
-    else:
-        nodes_number=0
+def method_this_paper(data_df,quantile=1,tau_max=0,pc_alpha=0.01,tau_min=0,both_tail_variable=0,contemp_collider_rule="conservative"):
+
     data_df_=data_df.apply(tranform_frechet,axis=0,raw=True)
     dataframeRvier=pp.DataFrame(data_df_.values,var_names=data_df_.columns)
-    tailparcorr = TailParCorr(quantile,both_tail=both_tail,variable_num=nodes_number)
+    tailparcorr = TailParCorr(quantile,variable_num=both_tail_variable)
     pcmci_parcorr = PCMCI(
         dataframe=dataframeRvier, 
         cond_ind_test=tailparcorr,
         verbosity=0)
     results_tail = pcmci_parcorr.run_pcmciplus(tau_max=tau_max, tau_min=tau_min,pc_alpha=pc_alpha,contemp_collider_rule=contemp_collider_rule)#
     return results_tail["graph"],results_tail
+
+
+class TailParCorr(CondIndTest):
+    r"""Partial correlation test.
+
+    Partial correlation is estimated through linear ordinary least squares (OLS)
+    regression and a test for non-zero linear Pearson correlation on the
+    residuals.
+
+    Notes
+    -----
+    To test :math:`X \perp Y | Z`, first :math:`Z` is regressed out from
+    :math:`X` and :math:`Y` assuming the  model
+
+    .. math::  X & =  Z \beta_X + \epsilon_{X} \\
+        Y & =  Z \beta_Y + \epsilon_{Y}
+
+    using OLS regression. Then the dependency of the residuals is tested with
+    the Pearson correlation test.
+
+    .. math::  \rho\left(r_X, r_Y\right)
+
+    For the ``significance='analytic'`` Student's-*t* distribution with
+    :math:`T-D_Z-2` degrees of freedom is implemented.
+
+    Parameters
+    ----------
+    **kwargs :
+        Arguments passed on to Parent class CondIndTest.
+    """
+    # documentation
+    @property
+    def measure(self):
+        """
+        Concrete property to return the measure of the independence test
+        """
+        return self._measure
+
+    def __init__(self,tail_quantile=5,variable_num=0,**kwargs):
+        self._measure = 'Tailpar_corr'
+        self.two_sided = True
+        self.residual_based = True
+        self.tail_quantile=tail_quantile
+        self.variable_num=variable_num
+
+        CondIndTest.__init__(self, **kwargs)
+
+
+
+    def run_test(self, X, Y, Z=None, tau_max=0, cut_off='2xtau_max'):
+        """Perform conditional independence test.
+
+        Calls the dependence measure and signficicance test functions. The child
+        classes must specify a function get_dependence_measure and either or
+        both functions get_analytic_significance and  get_shuffle_significance.
+        If recycle_residuals is True, also _get_single_residuals must be
+        available.
+
+        Parameters
+        ----------
+        X, Y, Z : list of tuples
+            X,Y,Z are of the form [(var, -tau)], where var specifies the
+            variable index and tau the time lag.
+
+        tau_max : int, optional (default: 0)
+            Maximum time lag. This may be used to make sure that estimates for
+            different lags in X, Z, all have the same sample size.
+
+        cut_off : {'2xtau_max', 'max_lag', 'max_lag_or_tau_max'}
+            How many samples to cutoff at the beginning. The default is
+            '2xtau_max', which guarantees that MCI tests are all conducted on
+            the same samples. For modeling, 'max_lag_or_tau_max' can be used,
+            which uses the maximum of tau_max and the conditions, which is
+            useful to compare multiple models on the same sample.  Last,
+            'max_lag' uses as much samples as possible.
+
+        Returns
+        -------
+        val, pval : Tuple of floats
+            The test statistic value and the p-value.
+        """
+        with threadpool_limits(limits=3):
+            # Get the array to test on
+            array, xyz, XYZ = self._get_array(X, Y, Z, tau_max, cut_off)
+            X, Y, Z = XYZ
+
+
+            # avoid link between two tails
+            if X[0][0]<2*self.variable_num and Y[0][0]<2*self.variable_num and abs(X[0][0]-Y[0][0])==self.variable_num and X[0][1]==Y[0][1]: 
+                return 0,1
+            # Record the dimensions
+            dim, T = array.shape
+            # Ensure it is a valid array
+            if np.any(np.isnan(array)):
+                raise ValueError("nans in the array!")
+
+            combined_hash = self._get_array_hash(array, xyz, XYZ)
+
+            if combined_hash in self.cached_ci_results.keys():
+                cached = True
+                val, pval = self.cached_ci_results[combined_hash]
+            else:
+                cached = False
+                # Get the dependence measure, reycling residuals if need be
+                val = self._get_dependence_measure_recycle(X, Y, Z, xyz, array)
+                # Get the p-value
+                pval = self.get_significance(val, array, xyz, T, dim)
+                self.cached_ci_results[combined_hash] = (val, pval)
+
+            if self.verbosity > 1:
+                self._print_cond_ind_results(val=val, pval=pval, cached=cached,
+                                            conf=None)
+            # Return the value and the pvalue
+            
+
+            
+            return val, pval
+
+
+    def get_dependence_measure(self, array, xyz):
+        """Return partial correlation.
+
+        Estimated as the Pearson correlation of the residuals of a linear
+        OLS regression.
+
+        Parameters
+        ----------
+        array : array-like
+            data array with X, Y, Z in rows and observations in columns
+
+        xyz : array of ints
+            XYZ identifier array of shape (dim,).
+
+        Returns
+        -------
+        val : float
+            Partial correlation coefficient.
+        """
+        if array.shape[0]==2:
+            residuals=array.T
+        else:
+            Y=array[:2,:].T
+            X=array[2:,:].T
+            b,_,_=regression(X,Y,self.tail_quantile)
+            residuals=Y-linear_transformation(X,b) 
+        coeff,tau2=estimate_tpdm1(residuals,quantile=self.tail_quantile,unit_frechet=False,include_var=True)
+        coeff=coeff[0,1]
+
+            
+        
+        deg_f = int(array.shape[1]*self.tail_quantile/100) - (array.shape[0])
+
+        if deg_f < 1:
+            pval = np.nan
+
+        else:
+            t_statistics=coeff/(tau2[0,1]**0.5)*(deg_f**0.5)
+            pval = stats.t.sf(abs(t_statistics), deg_f) * 2
+        
+        # if self.enhance_permutation and pval<self.pc_alpha:
+        #     for i in range(self.permutation_number):
+                
+        self.pval=pval
+        
+        return coeff
+        
+        
+
+
+
+    def get_analytic_significance(self, value, T, dim):
+        """Returns analytic p-value from Student's t-test for the Pearson
+        correlation coefficient.
+
+        Assumes two-sided correlation. If the degrees of freedom are less than
+        1, numpy.nan is returned.
+
+        Parameters
+        ----------
+        value : float
+            Test statistic value.
+
+        T : int
+            Sample length
+
+        dim : int
+            Dimensionality, ie, number of features.
+
+        Returns
+        -------
+        pval : float or numpy.nan
+            P-value.
+        """
+        # Get the number of degrees of freedom
+
+        return self.pval
+
+
+
+    def get_model_selection_criterion(self, j, parents, tau_max=0, corrected_aic=False):
+        """Returns Akaike's Information criterion modulo constants.
+
+        Fits a linear model of the parents to variable j and returns the
+        score. Leave-one-out cross-validation is asymptotically equivalent to
+        AIC for ordinary linear regression models. Here used to determine
+        optimal hyperparameters in PCMCI, in particular the pc_alpha value.
+
+        Parameters
+        ----------
+        j : int
+            Index of target variable in data array.
+
+        parents : list
+            List of form [(0, -1), (3, -2), ...] containing parents.
+
+        tau_max : int, optional (default: 0)
+            Maximum time lag. This may be used to make sure that estimates for
+            different lags in X, Z, all have the same sample size.
+
+        Returns:
+        score : float
+            Model score.
+        """
+
+        Y = [(j, 0)]
+        X = [(j, 0)]   # dummy variable here
+        Z = parents
+        array, xyz = self.dataframe.construct_array(X=X, Y=Y, Z=Z,
+                                                    tau_max=tau_max,
+                                                    mask_type=self.mask_type,
+                                                    return_cleaned_xyz=False,
+                                                    do_checks=True,
+                                                    verbosity=self.verbosity)
+
+        dim, T = array.shape
+
+        y = self._get_single_residuals(array, target_var=1, return_means=False)
+        # Get RSS
+        rss = (y**2).sum()
+        # Number of parameters
+        p = dim - 1
+        # Get AIC
+        if corrected_aic:
+            score = T * np.log(rss) + 2. * p + (2.*p**2 + 2.*p)/(T - p - 1)
+        else:
+            score = T * np.log(rss) + 2. * p
+        return score
+    
 
 
 
@@ -612,253 +879,6 @@ if 1:
 
 
 
-
-
-class TailParCorr(CondIndTest):
-    r"""Partial correlation test.
-
-    Partial correlation is estimated through linear ordinary least squares (OLS)
-    regression and a test for non-zero linear Pearson correlation on the
-    residuals.
-
-    Notes
-    -----
-    To test :math:`X \perp Y | Z`, first :math:`Z` is regressed out from
-    :math:`X` and :math:`Y` assuming the  model
-
-    .. math::  X & =  Z \beta_X + \epsilon_{X} \\
-        Y & =  Z \beta_Y + \epsilon_{Y}
-
-    using OLS regression. Then the dependency of the residuals is tested with
-    the Pearson correlation test.
-
-    .. math::  \rho\left(r_X, r_Y\right)
-
-    For the ``significance='analytic'`` Student's-*t* distribution with
-    :math:`T-D_Z-2` degrees of freedom is implemented.
-
-    Parameters
-    ----------
-    **kwargs :
-        Arguments passed on to Parent class CondIndTest.
-    """
-    # documentation
-    @property
-    def measure(self):
-        """
-        Concrete property to return the measure of the independence test
-        """
-        return self._measure
-
-    def __init__(self,tail_quantile=5,both_tail=False,variable_num=None,**kwargs):
-        self._measure = 'Tailpar_corr'
-        self.two_sided = True
-        self.residual_based = True
-        self.tail_quantile=tail_quantile
-        self.both_tail=both_tail
-        if self.both_tail:
-            self.variable_num=variable_num
-
-        CondIndTest.__init__(self, **kwargs)
-
-
-
-    def run_test(self, X, Y, Z=None, tau_max=0, cut_off='2xtau_max'):
-        """Perform conditional independence test.
-
-        Calls the dependence measure and signficicance test functions. The child
-        classes must specify a function get_dependence_measure and either or
-        both functions get_analytic_significance and  get_shuffle_significance.
-        If recycle_residuals is True, also _get_single_residuals must be
-        available.
-
-        Parameters
-        ----------
-        X, Y, Z : list of tuples
-            X,Y,Z are of the form [(var, -tau)], where var specifies the
-            variable index and tau the time lag.
-
-        tau_max : int, optional (default: 0)
-            Maximum time lag. This may be used to make sure that estimates for
-            different lags in X, Z, all have the same sample size.
-
-        cut_off : {'2xtau_max', 'max_lag', 'max_lag_or_tau_max'}
-            How many samples to cutoff at the beginning. The default is
-            '2xtau_max', which guarantees that MCI tests are all conducted on
-            the same samples. For modeling, 'max_lag_or_tau_max' can be used,
-            which uses the maximum of tau_max and the conditions, which is
-            useful to compare multiple models on the same sample.  Last,
-            'max_lag' uses as much samples as possible.
-
-        Returns
-        -------
-        val, pval : Tuple of floats
-            The test statistic value and the p-value.
-        """
-        with threadpool_limits(limits=3):
-            # Get the array to test on
-            array, xyz, XYZ = self._get_array(X, Y, Z, tau_max, cut_off)
-            X, Y, Z = XYZ
-            if self.both_tail and abs(X[0][0]-Y[0][0])==self.variable_num and X[0][1]==Y[0][1]:
-                return 0,1
-            # Record the dimensions
-            dim, T = array.shape
-            # Ensure it is a valid array
-            if np.any(np.isnan(array)):
-                raise ValueError("nans in the array!")
-
-            combined_hash = self._get_array_hash(array, xyz, XYZ)
-
-            if combined_hash in self.cached_ci_results.keys():
-                cached = True
-                val, pval = self.cached_ci_results[combined_hash]
-            else:
-                cached = False
-                # Get the dependence measure, reycling residuals if need be
-                val = self._get_dependence_measure_recycle(X, Y, Z, xyz, array)
-                # Get the p-value
-                pval = self.get_significance(val, array, xyz, T, dim)
-                self.cached_ci_results[combined_hash] = (val, pval)
-
-            if self.verbosity > 1:
-                self._print_cond_ind_results(val=val, pval=pval, cached=cached,
-                                            conf=None)
-            # Return the value and the pvalue
-            
-
-            
-            return val, pval
-
-
-    def get_dependence_measure(self, array, xyz):
-        """Return partial correlation.
-
-        Estimated as the Pearson correlation of the residuals of a linear
-        OLS regression.
-
-        Parameters
-        ----------
-        array : array-like
-            data array with X, Y, Z in rows and observations in columns
-
-        xyz : array of ints
-            XYZ identifier array of shape (dim,).
-
-        Returns
-        -------
-        val : float
-            Partial correlation coefficient.
-        """
-        if array.shape[0]==2:
-            residuals=array.T
-        else:
-            Y=array[:2,:].T
-            X=array[2:,:].T
-            b,_,_=regression(X,Y,self.tail_quantile)
-            residuals=Y-linear_transformation(X,b) 
-        coeff,tau2=estimate_tpdm1(residuals,quantile=self.tail_quantile,unit_frechet=False,include_var=True)
-        coeff=coeff[0,1]
-
-            
-        
-        deg_f = int(array.shape[1]*self.tail_quantile/100) - (array.shape[0])
-
-        if deg_f < 1:
-            pval = np.nan
-
-        else:
-            t_statistics=coeff/(tau2[0,1]**0.5)*(deg_f**0.5)
-            pval = stats.t.sf(abs(t_statistics), deg_f) * 2
-        
-        # if self.enhance_permutation and pval<self.pc_alpha:
-        #     for i in range(self.permutation_number):
-                
-        self.pval=pval
-        
-        return coeff
-        
-        
-
-
-
-    def get_analytic_significance(self, value, T, dim):
-        """Returns analytic p-value from Student's t-test for the Pearson
-        correlation coefficient.
-
-        Assumes two-sided correlation. If the degrees of freedom are less than
-        1, numpy.nan is returned.
-
-        Parameters
-        ----------
-        value : float
-            Test statistic value.
-
-        T : int
-            Sample length
-
-        dim : int
-            Dimensionality, ie, number of features.
-
-        Returns
-        -------
-        pval : float or numpy.nan
-            P-value.
-        """
-        # Get the number of degrees of freedom
-
-        return self.pval
-
-
-
-    def get_model_selection_criterion(self, j, parents, tau_max=0, corrected_aic=False):
-        """Returns Akaike's Information criterion modulo constants.
-
-        Fits a linear model of the parents to variable j and returns the
-        score. Leave-one-out cross-validation is asymptotically equivalent to
-        AIC for ordinary linear regression models. Here used to determine
-        optimal hyperparameters in PCMCI, in particular the pc_alpha value.
-
-        Parameters
-        ----------
-        j : int
-            Index of target variable in data array.
-
-        parents : list
-            List of form [(0, -1), (3, -2), ...] containing parents.
-
-        tau_max : int, optional (default: 0)
-            Maximum time lag. This may be used to make sure that estimates for
-            different lags in X, Z, all have the same sample size.
-
-        Returns:
-        score : float
-            Model score.
-        """
-
-        Y = [(j, 0)]
-        X = [(j, 0)]   # dummy variable here
-        Z = parents
-        array, xyz = self.dataframe.construct_array(X=X, Y=Y, Z=Z,
-                                                    tau_max=tau_max,
-                                                    mask_type=self.mask_type,
-                                                    return_cleaned_xyz=False,
-                                                    do_checks=True,
-                                                    verbosity=self.verbosity)
-
-        dim, T = array.shape
-
-        y = self._get_single_residuals(array, target_var=1, return_means=False)
-        # Get RSS
-        rss = (y**2).sum()
-        # Number of parameters
-        p = dim - 1
-        # Get AIC
-        if corrected_aic:
-            score = T * np.log(rss) + 2. * p + (2.*p**2 + 2.*p)/(T - p - 1)
-        else:
-            score = T * np.log(rss) + 2. * p
-        return score
-
 ## the minimum value is 1/shape, max value is 1 ,since F^ is \sum 1<=t
 def tranform_emp_cdf(array:np.ndarray,add_1:bool=False):
 
@@ -969,3 +989,28 @@ def get_return_from_df(df,interval,keep_segment=False,subsampling=True):
 
     return_df=pd.concat(return_dfs,axis=0)
     return return_df
+
+
+
+
+## categories of the futures, based on the report Citic Futures
+categories={'oil crops': ['a', 'm', 'OI', 'p', 'b', 'RM',  'y'], #'RS',
+ 'precious metals': ['ag', 'au'],
+ 'nonferrous metals': ['al', 'bc', 'cu', 'ni', 'pb', 'sn', 'zn','ao'],
+ 'economic crops': ['AP', 'CF', 'CJ', 'CY', 'PK', 'SR'],
+ 'rubber&woods': [ 'br', 'fb', 'nr', 'ru', 'sp'], #"bb"
+ 'oil&gas': ['bu', 'fu', 'lu', 'pg', 'sc'],
+ 'grains': ['c', 'cs'], #'JR', 'LR', "PM", "RI", "WH", 'rr'
+ 'olefins': ['eb', 'l', 'pp', 'v'],
+ 'alcohols': ['eg', 'MA'],
+ 'inorganics': ['FG', 'SA', 'UR', 'SH'],
+ 'ferrous metals': ['hc', 'i', 'rb', 'SF', 'SM', 'ss'],#'wr'
+ 'equity index': ['IC', 'IF', 'IH', 'IM'],
+ 'coals': ['j', 'jm'], #"ZC"
+ 'animals': ['jd', 'lh'],
+ 'novel materials': ['lc', 'si'],
+ 'aromatics': ['PF', 'TA', 'PX'],
+ 'interest rates': ['T', 'TF', 'TL', 'TS'],
+ 'indices': ['ec']}
+
+ ## lg and ps are not included neither (not available since the start data)
