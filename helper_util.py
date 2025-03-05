@@ -889,8 +889,50 @@ def tranform_emp_cdf(array:np.ndarray,add_1:bool=False):
         return (sorted)/(array.shape[0])
 
 
+def transform_regular_varing_df(df_):
+    df=df_.copy()
+
+    return_df=df.apply(transform_rv_whole,axis=0,raw=True)
+
+
+    return return_df
+
+def tranform_frechet_df(df_):
+
+    df=df_.copy()
+    return_df=df.apply(tranform_frechet,axis=0,raw=True)
+    return return_df
+
+def transform_rv_whole(X:np.ndarray):   
+    """
+    Transforms the input array into a Symmetric pareto distribution.
+    
+    Parameters:
+    X (np.ndarray): The input array to be transformed.
+    
+    Returns:
+    np.ndarray: The transformed array where values greater than the median are adjusted by subtracting the square root of 2, 
+                and values less than the median are adjusted by adding the square root of 2.
+    """
+    new=X.copy()
+    m=np.median(X)
+    new[X>m]=tranform_frechet(X)[X>m]-np.sqrt(2)
+    new[X<m]=-tranform_frechet(-X)[X<m]+np.sqrt(2)
+    return new
+
+
 
 def tranform_frechet(array:np.ndarray):
+    """
+    Converts the input array into a Frechet distribution.
+    
+    Parameters:
+    array (np.ndarray): The input array to be transformed.
+    
+    Returns:
+    np.ndarray: The transformed array using the empirical cumulative distribution function, 
+                adjusted to follow a Frechet distribution by applying a power transformation and a constant shift.
+    """
     tmp_array=array.copy()
     ferchet=np.power(1-tranform_emp_cdf(tmp_array),-0.5)-0.9352
 
