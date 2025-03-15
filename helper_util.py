@@ -414,7 +414,7 @@ class TailParCorr(CondIndTest):
 
         else:
             t_statistics=coeff/(tau2[0,1]**0.5)*(deg_f**0.5)
-            pval = stats.t.sf(abs(t_statistics), deg_f) * 2
+            pval = stats.t.sf(t_statistics, deg_f) 
         
         # if self.enhance_permutation and pval<self.pc_alpha:
         #     for i in range(self.permutation_number):
@@ -1056,3 +1056,8 @@ categories={'oil crops': ['a', 'm', 'OI', 'p', 'b', 'RM',  'y'], #'RS',
  'indices': ['ec']}
 
  ## lg and ps are not included neither (not available since the start data)
+
+
+
+
+ 

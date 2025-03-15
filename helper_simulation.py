@@ -510,3 +510,85 @@ def compute_spectral_radius(adjacency_matrix):
     spectral_radius = max(abs(eigvals))
 
     return spectral_radius
+
+
+def simulate_Stieltjes_sparse(num_nodes, sparsity):
+    """Generate a sparse Stieltjes matrix for M-matrix simulation
+    Args:
+        num_nodes (int): Dimension of the square matrix
+        sparsity (float): Probability of connection between nodes (0-1)
+    Returns:
+        np.ndarray: Generated Stieltjes matrix
+    """
+    # Initialize adjacency matrix
+    adj = np.zeros((num_nodes, num_nodes))
+    
+    # Fill upper triangle with random negative values based on sparsity
+    for i in range(num_nodes):
+        for j in range(i+1, num_nodes):
+            if np.random.rand() < sparsity:
+                adj[i, j] = -np.random.rand()
+                adj[j, i] = adj[i, j]  # Make symmetric
+                
+    # Calculate spectral radius and set diagonal for M-matrix property
+    rho = 0.1+abs(np.linalg.eigvals(-adj)).max()
+    adj[np.arange(num_nodes), np.arange(num_nodes)] = rho * 1.2  # Ensure diagonal dominance
+    
+    return adj
+
+
+def generate_markov_network(num_nodes, edge_probability=0.3):
+
+
+
+    precision_Matrix=simulate_Stieltjes_sparse(num_nodes,edge_probability)
+
+    edge_shape=np.zeros(shape=(num_nodes,num_nodes,1), dtype='<U3')
+
+    edge_shape[:,:,0][precision_Matrix!=0]="o-o"
+    edge_shape[:,:,0][np.arange(num_nodes),np.arange(num_nodes)]=""
+
+    return precision_Matrix,edge_shape
+
+
+
+def is_positive_definite(matrix):
+    """Check if a matrix is positive definite
+    Args:
+        matrix (np.ndarray): Input matrix to check
+    Returns:
+        bool: True if positive definite
+    """
+    # First check if matrix is symmetric
+    if not np.allclose(matrix, matrix.T):
+        return False
+    
+    # Calculate eigenvalues using efficient Hermitian method
+    eigenvalues = np.linalg.eigvalsh(matrix)
+    
+    # Check all eigenvalues are positive
+    return np.all(eigenvalues > 0)
+
+
+def is_inverse_positive_definite(matrix):
+    """Check if matrix inverse is positive definite"""
+    return is_positive_definite(np.linalg.inv(matrix))
+
+
+def is_inverse_positive(matrix):
+    """Check if matrix inverse has all non-negative elements"""
+    return (np.linalg.inv(matrix) >= 0).all()
+
+
+''' 
+# Simulation test for matrix properties
+# Generates 100 random matrices and verifies:
+# 1. Matrix is positive definite
+# 2. Its inverse is positive definite 
+# 3. Its inverse has all non-negative elements
+for i in range(100):
+    example = simulate_Stieltjes_sparse(100, 0.2)
+    assert is_positive_definite(example)
+    assert is_inverse_positive_definite(example)
+    assert is_inverse_positive(example)
+'''

@@ -30,8 +30,7 @@ from helper_simulation import *
 
 
 ## PARAMS for test
-comparison_number=50
-optimize_for_gong=10
+comparison_number=5
 
 comparison_nodes=np.array([5,9,15,35,50])
 sparcitys=np.array([0.4,0.2,0.1,0.04,0.03])
@@ -65,10 +64,11 @@ for config_i, nodes_number in enumerate(comparison_nodes):
     test_number=0
     while (test_number<comparison_number):
         logger.info(f"Test {test_number}")
-        adjacency_matrix,ground_true_graph = generate_dag(nodes_number,edge_probability=sparcity)
-        IC_1=np.linalg.inv(np.eye(adjacency_matrix.shape[0])-adjacency_matrix)
+        precision_Matrix,ground_true_graph = generate_markov_network(nodes_number,edge_probability=sparcity)
+        tpdm=np.linalg.inv(precision_Matrix)
+        weights=np.linalg.cholesky(tpdm)
         N_data=simulation(numeberOfData,nodes_number).T
-        X_data=otimes(IC_1,N_data,False)
+        X_data=otimes(weights.T,N_data,False)
         data_df=pd.DataFrame(X_data.T)
         resultsthis_paper,_=method_this_paper(data_df,quantile=quantile,pc_alpha=pc_alpha,tau_max=0)
         resultsGong=ComparisonGong(data_df,0.03,2)

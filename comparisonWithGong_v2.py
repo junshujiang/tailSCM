@@ -88,11 +88,14 @@ if __name__ == '__main__':
         to_test_datas=[]
         for i in range(optimization_number):
             np.random.seed(i)   
-            adjacency_matrix,ground_true_graph = generate_dag(nodes_number,edge_probability=sparcity)
-            IC_1=np.linalg.inv(np.eye(adjacency_matrix.shape[0])-adjacency_matrix)
-            N_data=simulation(numeberOfData,nodes_number).T 
-            X_data=otimes(IC_1,N_data)
+            precision_Matrix,ground_true_graph = generate_markov_network(nodes_number,edge_probability=sparcity)
+            tpdm=np.linalg.inv(precision_Matrix)
+            weights=np.linalg.cholesky(tpdm)
+            N_data=simulation(numeberOfData,nodes_number).T
+            X_data=otimes(weights.T,N_data,False)
             data_df=pd.DataFrame(X_data.T)
+
+
             to_test_datas.append((data_df,ground_true_graph))
 
         for alpha,beta in params:
@@ -115,10 +118,11 @@ if __name__ == '__main__':
         test_number=0
         while (test_number<comparison_number):
             logger.info(f"Test {test_number}")
-            adjacency_matrix,ground_true_graph = generate_dag(nodes_number,edge_probability=sparcity)
-            IC_1=np.linalg.inv(np.eye(adjacency_matrix.shape[0])-adjacency_matrix)
-            N_data=simulation(numeberOfData,nodes_number).T 
-            X_data=otimes(IC_1,N_data)
+            precision_Matrix,ground_true_graph = generate_markov_network(nodes_number,edge_probability=sparcity)
+            tpdm=np.linalg.inv(precision_Matrix)
+            weights=np.linalg.cholesky(tpdm)
+            N_data=simulation(numeberOfData,nodes_number).T
+            X_data=otimes(weights.T,N_data,False)
             data_df=pd.DataFrame(X_data.T)
             resultsthis_paper,_=method_this_paper(data_df,quantile=quantile,pc_alpha=pc_alpha,tau_max=0)
             resultsGong=ComparisonGong(data_df,best_alpha,best_beta)
