@@ -64,6 +64,11 @@ def generate_dag(num_nodes, edge_probability=0.3,lagged_causal=False):
             if np.random.rand() < edge_probability:
                 adjacency_matrix[i, j] = np.random.rand()
 
+
+    adjacency_matrix=adjacency_matrix.T
+    
+
+
     edge_shape=np.zeros(shape=(num_nodes,num_nodes,1), dtype='<U3')
     for i in range(adjacency_matrix.shape[0]):
         for j in range(adjacency_matrix.shape[1]):
