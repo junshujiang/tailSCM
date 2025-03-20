@@ -186,22 +186,26 @@ Output:
 '''
 
 
-def compare_graphs(graph1,graph2,lagged=False):
-    
-    assert graph1.shape==graph2.shape
-    edges1=np.zeros_like(graph1,dtype=int)
-    edges2=np.zeros_like(graph2,dtype=int)
-    edges1[graph1!=""]=1 
-    edges2[graph2!=""]=1
-    if lagged:
-        mismatch=(edges1!=edges2).sum()
-        totalEdges=(edges1.sum()+edges2.sum())
-    else:
-        mismatch=(edges1!=edges2).sum()/2
-        totalEdges=(edges1.sum()+edges2.sum())/2
-    
-    return mismatch/totalEdges,mismatch
+def compare_graphs(graph1,graph2,ignore_direction=False):
 
+    assert graph1.shape==graph2.shape
+    graph1_tmp=graph1.copy()
+    graph2_tmp=graph2.copy()
+
+
+    num_of_edges1=(graph1_tmp!="").sum()
+    num_of_edges2=(graph2_tmp!="").sum()
+    total_edges=num_of_edges1+num_of_edges2
+
+    if ignore_direction:
+        graph1_tmp[graph1_tmp!=""]="--"
+        graph2_tmp[graph2_tmp!=""]="--"
+
+    mismatch=(graph1_tmp!=graph2_tmp).sum()
+
+    
+    
+    return mismatch/total_edges,mismatch
 
 
 ''' 

@@ -238,7 +238,7 @@ Input:
     tau_min: int, the minimum time lag to consider (default is 0).
     both_tail: bool, indicates whether to consider both tails in the TailParCorr test (default is False).
     nodes_number: int, the number of nodes/variables in the data (default is 0).
-    contemp_collider_rule: str, the rule for handling contemporaneous colliders in PCMCI (default is "conservative").
+    contemp_collider_rule: str, the rule for handling contemporaneous colliders in PCMCI (default is "").
 
 Output:
     graph: np.array, the resulting graph from the PCMCI algorithm.
@@ -246,7 +246,7 @@ Output:
 '''
 
 
-def method_this_paper(data_df,quantile=1,tau_max=0,pc_alpha=0.01,tau_min=0,both_tail_variable=0,contemp_collider_rule="conservative"):
+def method_this_paper(data_df,quantile=1,tau_max=0,pc_alpha=0.01,tau_min=0,both_tail_variable=0,verbosity=0):
 
     data_df_=data_df.apply(tranform_frechet,axis=0,raw=True)
     dataframeRvier=pp.DataFrame(data_df_.values,var_names=data_df_.columns)
@@ -254,10 +254,9 @@ def method_this_paper(data_df,quantile=1,tau_max=0,pc_alpha=0.01,tau_min=0,both_
     pcmci_parcorr = PCMCI(
         dataframe=dataframeRvier, 
         cond_ind_test=tailparcorr,
-        verbosity=0)
-    results_tail = pcmci_parcorr.run_pcmciplus(tau_max=tau_max, tau_min=tau_min,pc_alpha=pc_alpha,contemp_collider_rule=contemp_collider_rule)#
+        verbosity=verbosity)
+    results_tail = pcmci_parcorr.run_pcmciplus(tau_max=tau_max, tau_min=tau_min,pc_alpha=pc_alpha)#
     return results_tail["graph"],results_tail
-
 
 class TailParCorr(CondIndTest):
     r"""Partial correlation test.
@@ -344,9 +343,11 @@ class TailParCorr(CondIndTest):
             X, Y, Z = XYZ
 
 
-            # avoid link between two tails
-            if X[0][0]<2*self.variable_num and Y[0][0]<2*self.variable_num and abs(X[0][0]-Y[0][0])==self.variable_num and X[0][1]==Y[0][1]: 
-                return 0,1
+
+            if self.variable_num!=0:
+                # avoid link between two tails
+                if X[0][0]<2*self.variable_num and Y[0][0]<2*self.variable_num and abs(X[0][0]-Y[0][0])==self.variable_num and X[0][1]==Y[0][1]: 
+                    return 0,1
             # Record the dimensions
             dim, T = array.shape
             # Ensure it is a valid array
@@ -396,14 +397,16 @@ class TailParCorr(CondIndTest):
             Partial correlation coefficient.
         """
         if array.shape[0]==2:
-            residuals=array.T
+            residuals=transform_softplus(array.T,True)
+            coeff,tau2=estimate_tpdm1(residuals,quantile=self.tail_quantile,unit_frechet=True,include_var=True)
+            coeff=coeff[0,1]
         else:
             Y=array[:2,:].T
             X=array[2:,:].T
             b,_,_=regression(X,Y,self.tail_quantile)
-            residuals=Y-linear_transformation(X,b) 
-        coeff,tau2=estimate_tpdm1(residuals,quantile=self.tail_quantile,unit_frechet=False,include_var=True)
-        coeff=coeff[0,1]
+            residuals=transform_softplus(Y,True)-linear_transformation(X,b,False) 
+            coeff,tau2=estimate_tpdm1(residuals,quantile=self.tail_quantile,unit_frechet=False,include_var=True)
+            coeff=coeff[0,1]
 
             
         
@@ -414,7 +417,7 @@ class TailParCorr(CondIndTest):
 
         else:
             t_statistics=coeff/(tau2[0,1]**0.5)*(deg_f**0.5)
-            pval = stats.t.sf(t_statistics, deg_f) 
+            pval = stats.t.sf(abs(t_statistics), deg_f) * 2
         
         # if self.enhance_permutation and pval<self.pc_alpha:
         #     for i in range(self.permutation_number):
@@ -422,6 +425,7 @@ class TailParCorr(CondIndTest):
         self.pval=pval
         
         return coeff
+        
         
         
 
