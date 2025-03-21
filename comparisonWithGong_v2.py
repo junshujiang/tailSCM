@@ -104,7 +104,7 @@ if __name__ == '__main__':
             for data_df,ground_true_graph in to_test_datas:
 
                 resultsGong=ComparisonGong(data_df,alpha,beta)
-                error_list.append(compare_graphs(ground_true_graph,resultsGong)[0])
+                error_list.append(compare_graphs(ground_true_graph,resultsGong,True)[0])
             error_this=np.mean(error_list)
             if error_this<smaller_error:
                 smaller_error=error_this
@@ -127,8 +127,8 @@ if __name__ == '__main__':
             resultsthis_paper,_=method_this_paper(data_df,quantile=quantile,pc_alpha=pc_alpha,tau_max=0)
             resultsGong=ComparisonGong(data_df,best_alpha,best_beta)
             test_number=test_number+1
-            result_this.append(compare_graphs(ground_true_graph,resultsthis_paper))
-            result_Gong.append(compare_graphs(ground_true_graph,resultsGong))
+            result_this.append(compare_graphs(ground_true_graph,resultsthis_paper,True))
+            result_Gong.append(compare_graphs(ground_true_graph,resultsGong,True))
         results[config_i]["THIS"]=result_this
         results[config_i]["GONG"]=result_Gong
 

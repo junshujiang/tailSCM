@@ -259,7 +259,7 @@ def is_upper_triangular(matrix):
 
 def simulation_timeseries(T, burn_in, adjacency_matrix):
     # Check if the first slice of the input adjacency matrix is upper triangular
-    assert is_upper_triangular(adjacency_matrix[:, :, 0])
+    assert is_upper_triangular(adjacency_matrix[:, :, 0].T)
     # Calculate the number of lags, tau
     tau = adjacency_matrix.shape[2] - 1
     num_nodes=adjacency_matrix.shape[0]
