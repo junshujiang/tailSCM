@@ -186,7 +186,7 @@ Output:
 '''
 
 
-def compare_graphs(graph1,graph2,ignore_direction=False):
+def compare_graphs(graph1,graph2,ignore_direction=False,ignore_comtemperous=False):
 
     assert graph1.shape==graph2.shape
     graph1_tmp=graph1.copy()
@@ -200,6 +200,10 @@ def compare_graphs(graph1,graph2,ignore_direction=False):
     if ignore_direction:
         graph1_tmp[graph1_tmp!=""]="--"
         graph2_tmp[graph2_tmp!=""]="--"
+
+    if ignore_comtemperous:
+        graph1_tmp[:,:,0]=""
+        graph2_tmp[:,:,0]=""
 
     mismatch=(graph1_tmp!=graph2_tmp).sum()
 
