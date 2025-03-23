@@ -134,8 +134,9 @@ def draw_graph(edge_shape,save_path=None,**kwargs):
         show_colorbar=False,
         **kwargs
         )
+    plt.tight_layout(pad=0)
     if save_path is not None:
-        plt.tight_layout(pad=0)
+        
         plt.savefig(save_path,dpi=200,  pad_inches=0)
     else:
         plt.show()

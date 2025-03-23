@@ -39,7 +39,7 @@ if __name__=="__main__":
     comparison_number=50
     comparison_nodes=np.array([5,9,15,35,50])
     sparcitys=np.array([0.4,0.2,0.1,0.04,0.03])
-    close_contemp=False
+    close_contemp=True
 
 
     numeberOfLength=5000
