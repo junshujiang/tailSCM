@@ -11,7 +11,7 @@ pd.set_option('display.max_rows', None)
 if __name__=="__main__":
 
     INTERVAL=600
-    pc_alpha=0.01
+    pc_alpha=0.005
     quantile=1
 
 
@@ -325,32 +325,25 @@ if __name__=="__main__":
 
 
 
+    # ------------------------VOLUME GRAPH--------------------------------
 
-
-    # ------------------------WHOLE MARKET--------------------------------
 
 
     all_assets=[]
     for category in categories:
         all_assets.extend(categories[category])
     all_assets=sorted(all_assets)
-    ## [TODO] check if the sorted all_assets is required.
-
-    len(all_assets)
-
-    sub_df=df_in_one[[f"{x}_0.price" for x in all_assets]]
 
 
-    data_df_bar=expand_data_df(sub_df)
+
 
     sub_df_vol=df_in_one[[f"{x}_0.volume" for x in all_assets]]
 
-    data_df_bar_vol=pd.concat([data_df_bar,sub_df_vol],axis=1)
 
 
 
 
-    resultsThisPaper,results_tail=method_this_paper(data_df_bar_vol,pc_alpha=pc_alpha,quantile=quantile,tau_max=1,both_tail_variable=sub_df.shape[1])
+    resultsThisPaper,results_tail=method_this_paper(sub_df_vol,pc_alpha=pc_alpha,quantile=quantile,tau_max=1,both_tail_variable=0)
     #l0.01_q1.pkl"
     import pickle
     pickle.dump(resultsThisPaper,open(os.path.join(log_path,"whole_market_resultsThisPaper.pkl"),"wb"))
@@ -362,7 +355,7 @@ if __name__=="__main__":
     possible_edge_number=((len(all_assets)*3)**2)
     print(f"edge number: {edge_number}, possible edge number: {possible_edge_number}, sparsity ratio: {edge_number/possible_edge_number:.2%}")
     logger.info(f"edge number: {edge_number}, possible edge number: {possible_edge_number}, sparsity ratio: {edge_number/possible_edge_number:.2%}")
-    var_names=np.array([f"${i}^{{u}}$" for i in all_assets]+[f"${i}^{{l}}$" for i in all_assets]+[f"${i}.vol$" for i in all_assets])
+    var_names=np.array([f"${i}.vol$" for i in all_assets])
 
 
 
@@ -375,3 +368,54 @@ if __name__=="__main__":
 
     figsize=(50,50)
     draw_graph(arrow_linewidth=3,arrowhead_size=5,node_size=0.02,label_fontsize=15,figsize=figsize,**sort_name_and_edge_price_volume(resultsThisPaper,var_names),save_path=save_path)
+
+
+
+    # ------------------------WHOLE MARKET--------------------------------
+
+
+    # all_assets=[]
+    # for category in categories:
+    #     all_assets.extend(categories[category])
+    # all_assets=sorted(all_assets)
+    # ## [TODO] check if the sorted all_assets is required.
+
+    # len(all_assets)
+
+    # sub_df=df_in_one[[f"{x}_0.price" for x in all_assets]]
+
+
+    # data_df_bar=expand_data_df(sub_df)
+
+    # sub_df_vol=df_in_one[[f"{x}_0.volume" for x in all_assets]]
+
+    # data_df_bar_vol=pd.concat([data_df_bar,sub_df_vol],axis=1)
+
+
+
+
+    # resultsThisPaper,results_tail=method_this_paper(data_df_bar_vol,pc_alpha=pc_alpha,quantile=quantile,tau_max=1,both_tail_variable=sub_df.shape[1])
+    # #l0.01_q1.pkl"
+    # import pickle
+    # pickle.dump(resultsThisPaper,open(os.path.join(log_path,"whole_market_resultsThisPaper.pkl"),"wb"))
+    # pickle.dump(results_tail,open(os.path.join(log_path,f"whole_market_results_detail{pc_alpha}_q{quantile}.pkl"),"wb"))
+    # pickle.dump(all_assets,open(os.path.join(log_path,"all_assets.pkl"),"wb"))
+    # edge_number=((resultsThisPaper[:,:,0]!="").sum()/2+(resultsThisPaper[:,:,1]!="").sum())
+
+
+    # possible_edge_number=((len(all_assets)*3)**2)
+    # print(f"edge number: {edge_number}, possible edge number: {possible_edge_number}, sparsity ratio: {edge_number/possible_edge_number:.2%}")
+    # logger.info(f"edge number: {edge_number}, possible edge number: {possible_edge_number}, sparsity ratio: {edge_number/possible_edge_number:.2%}")
+    # var_names=np.array([f"${i}^{{u}}$" for i in all_assets]+[f"${i}^{{l}}$" for i in all_assets]+[f"${i}.vol$" for i in all_assets])
+
+
+
+    # save_path=os.path.join(log_path,f"all_assets_olut_timeseries_graph{pc_alpha}_q{quantile}.png")
+
+    # draw_graph_timeseries(vmin_edges=0,vmax_edges=1,show_colorbar=False,save_path=save_path,**sort_name_and_edge_price_volume(resultsThisPaper,var_names),figsize=(50,50))
+
+    # save_path=os.path.join(log_path,f"all_assets_olut_graph{pc_alpha}_q{quantile}.png")
+    # logger.info(f"save path: {save_path}")
+
+    # figsize=(50,50)
+    # draw_graph(arrow_linewidth=3,arrowhead_size=5,node_size=0.02,label_fontsize=15,figsize=figsize,**sort_name_and_edge_price_volume(resultsThisPaper,var_names),save_path=save_path)

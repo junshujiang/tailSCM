@@ -53,9 +53,10 @@ results={}
 for config_i, nodes_number in enumerate(comparison_nodes):
     sparcity=sparcitys[config_i]
     logger.info(f"Start test for {nodes_number} nodes, Sparcity {sparcity}")
-    results[config_i]={"THIS_DIRECTION":[],"THIS_WITHOUT_DIRECTION":[]}
+    results[config_i]={"THIS_DIRECTION":[],"THIS_WITHOUT_DIRECTION":[],"REMOVE_UNDETECTABLE":[]}
     result_this_direction=[]
     result_this_without_direction=[]
+    result_remove_undetecable=[]
     
     test_number=0
     while (test_number<comparison_number):
@@ -69,20 +70,23 @@ for config_i, nodes_number in enumerate(comparison_nodes):
         test_number=test_number+1
         result_this_without_direction.append(compare_graphs(ground_true_graph,resultsthis_paper,True))
         result_this_direction.append(compare_graphs(ground_true_graph,resultsthis_paper,False))
+        result_remove_undetecable.append(compare_graphs_without_undetectable(resultsthis_paper,ground_true_graph))
     results[config_i]["THIS_WITHOUT_DIRECTION"]=result_this_without_direction
     results[config_i]["THIS_DIRECTION"]=result_this_direction
+    results[config_i]["REMOVE_UNDETECTABLE"]=result_remove_undetecable
     
     
 results_df=[]
 results_ori=[]
 for config_i in results:
     df_tmp_ori=pd.DataFrame({"THIS_WITHOUT_DIRECTION":[x[0] for x in results[config_i]["THIS_WITHOUT_DIRECTION"]],
-            "THIS_DIRECTION":[x[0] for x in results[config_i]["THIS_DIRECTION"]]})
+            "THIS_DIRECTION":[x[0] for x in results[config_i]["THIS_DIRECTION"]],
+            "REMOVE_UNDETECTABLE":[x[0] for x in results[config_i]["REMOVE_UNDETECTABLE"]]})
     results_ori.append(df_tmp_ori)
     mean=df_tmp_ori.mean()
     std=df_tmp_ori.std()
     df_tmp=pd.concat([mean,std],axis=0)
-    df_tmp.index=["THIS_WITHOUT_DIRECTION_mean","THIS_WITHOUT_DIRECTION_std","THIS_DIRECTION_mean","THIS_DIRECTION_std"]
+    df_tmp.index=["THIS_WITHOUT_DIRECTION_mean","THIS_WITHOUT_DIRECTION_std","THIS_DIRECTION_mean","THIS_DIRECTION_std","REMOVE_UNDETECTABLE_mean","REMOVE_UNDETECTABLE_std"]
     df_tmp=pd.DataFrame(df_tmp).T    
     results_df.append(df_tmp)
 with open(os.path.join(log_path,f"result_ori.pkl"),"wb") as f:
@@ -98,17 +102,17 @@ logger.info(f"Results saved to {os.path.join(log_path,'THISComparison.csv')}")
 results = pd.concat(results_ori)
 
 df = pd.DataFrame()
-df["values"] = np.concatenate([results.values[:, 0], results.values[:, 1]])
-df["model"] = (['$NED$'] * results.shape[0] + ['$UNED$'] * results.shape[0])
+df["values"] = np.concatenate([results.values[:, 0], results.values[:, 1],results.values[:, 2]])
+df["model"] = (['$UNED$'] * results.shape[0] + ['$NED$'] * results.shape[0] + ['$NED^*$'] * results.shape[0])
 settings = [f"({node}, {sparcity})" for node, sparcity in zip(comparison_nodes, sparcitys)]
 models = []
 
 for s in settings:
     models.extend([s] * comparison_number)
-df["experiment"] = models * 2
+df["experiment"] = models * 3
 
 # Draw grouped boxplot
-custom_palette = ['#1f77b4', 'orange']  # First is blue, second is orange
+custom_palette = ['#1f77b4', 'orange','green']  # First is blue, second is orange
 sns.boxplot(x='experiment', y='values', hue='model', data=df, palette=custom_palette)
 plt.ylim(-0.01, 1)
 # Add title

@@ -49,12 +49,12 @@ def ComparisonBodik(data:pd.DataFrame,lag=2)->np.array: ##shape=(n_samples,n_fea
         raise e
     return adj_matrix
         
-def ComparisonGong(data:pd.DataFrame,alpha=0.04,beta=1.26)->np.array: ##shape=(n_samples,n_features)
+def ComparisonGong(data:pd.DataFrame,alpha=0.04,beta=1.26,quantile=0.99)->np.array: ##shape=(n_samples,n_features)
     robjects.r(""" 
 
     source("othersWork/yangong.R")
 
-    gong<-function(input,alpha,beta){
+    gong<-function(input,alpha,beta,q){
 
     d = dim(input)[2]
     n = dim(input)[1]
@@ -75,7 +75,7 @@ def ComparisonGong(data:pd.DataFrame,alpha=0.04,beta=1.26)->np.array: ##shape=(n
     r = apply(x, 1, mynorm)
     w = x/r
     n.samp = n
-    r0 = quantile(r, 0.99) # 0.99 is the threshold to be specified
+    r0 = quantile(r, q) # 0.99 is the threshold to be specified
     n_exc = sum(r>r0)
     m = p
     TPDM <- matrix(nrow = p, ncol = p)
@@ -108,7 +108,7 @@ def ComparisonGong(data:pd.DataFrame,alpha=0.04,beta=1.26)->np.array: ##shape=(n
 
     function=robjects.r["gong"]
     with localconverter(robjects.default_converter + pandas2ri.converter):
-        r_data= function(data,alpha,beta)
+        r_data= function(data,alpha,beta,quantile)
     adj_matrix=np.array(r_data)
     results=adj_matrix[:,:,np.newaxis]
     x=np.zeros_like(results,dtype='<U3')
