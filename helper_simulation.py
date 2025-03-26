@@ -1,3 +1,4 @@
+import causaldag as cd
 import pandas as pd
 import numpy as np 
 from threadpoolctl import threadpool_limits
@@ -209,7 +210,34 @@ def compare_graphs(graph1,graph2,ignore_direction=False,ignore_comtemperous=Fals
 
     
     
-    return mismatch/total_edges,mismatch
+    return mismatch/(1e-5+total_edges),mismatch
+
+
+
+
+def compare_graphs_without_undetectable(graph1,ground_truth):
+    graph1_tmp=graph1.copy()
+    graph2_tmp=ground_truth.copy()
+    arcs = set()
+    undetected_edges=np.zeros_like(ground_truth,dtype=int)
+    for i in range(ground_truth.shape[0]):
+        for j in range(ground_truth.shape[1]):
+            if ground_truth[i,j,0]=="-->":
+                arcs.add((i,j))
+    dag = cd.DAG(arcs=arcs)
+    cpdag = dag.cpdag()
+    for edge in iter(cpdag.edges):
+
+        start,end=list(edge)
+        undetected_edges[start,end,0]=1
+        undetected_edges[end,start,0]=1
+    graph1_tmp[undetected_edges==1]=""
+    graph2_tmp[undetected_edges==1]=""
+    return compare_graphs(graph1_tmp,graph2_tmp,ignore_direction=False)
+
+
+
+    
 
 
 ''' 
