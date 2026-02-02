@@ -210,7 +210,7 @@ def compare_graphs(graph1,graph2,ignore_direction=False,ignore_comtemperous=Fals
 
     
     
-    return mismatch/(1e-5+total_edges),mismatch
+    return mismatch/(1e-5+total_edges),mismatch,total_edges
 
 
 
@@ -327,6 +327,28 @@ def simulation_timeseries(T, burn_in, adjacency_matrix):
     # Convert the final time series data to DataFrame format and return
     data_df = pd.DataFrame(np.array(X_data_list[-T:]))
     return data_df
+
+
+def simulation_cross_section(N, adjacency_matrix):
+    """
+    Simulate cross-sectional data from a contemporaneous DAG with Frechet noise.
+    X = (I - B)^{-1} N, where N is d-dimensional Frechet and B is the adjacency matrix.
+
+    Parameters:
+        N (int): Number of samples.
+        adjacency_matrix (np.ndarray): (d, d) adjacency matrix; column i = parents of i.
+
+    Returns:
+        pd.DataFrame: (N, d) data.
+    """
+    d = adjacency_matrix.shape[0]
+    rho = max(abs(np.linalg.eigvals(adjacency_matrix)))
+    if rho >= 1:
+        adjacency_matrix = adjacency_matrix / (rho * 1.1)
+    N_data = simulation(N, d).T  # (d, N)
+    IC_0 = np.linalg.inv(np.eye(d) - adjacency_matrix)
+    X = (IC_0 @ N_data).T  # (N, d)
+    return pd.DataFrame(X)
 
 
 def generate_dag_timeseries_for_both_tail(num_nodes, sparsity_lag, sparsity_contemp, tau):

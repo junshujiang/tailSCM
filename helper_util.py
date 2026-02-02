@@ -418,7 +418,7 @@ class TailParCorr(CondIndTest):
 
         else:
             t_statistics=coeff/(tau2[0,1]**0.5)*(deg_f**0.5)
-            pval = stats.t.sf(abs(t_statistics), deg_f) * 2
+            pval = stats.t.sf(t_statistics, deg_f) 
         
         # if self.enhance_permutation and pval<self.pc_alpha:
         #     for i in range(self.permutation_number):
@@ -631,13 +631,12 @@ def estimate_tpdm1(array1:np.array,array2:np.array=None,quantile=10,unit_frechet
     tpdm=m*tpdm_
     
     if include_var:
-        ex2y2=np.matmul((filter_1_f**2).T,((filter_2_f)**2))/(needed_sample-1)
-        exy2=(np.matmul(filter_1_f.T,(filter_2_f))/(needed_sample-1))**2
+        ex2y2=np.matmul((filter_1_f**2).T,((filter_2_f)**2))/(needed_sample)
+        exy2=(np.matmul(filter_1_f.T,(filter_2_f))/(needed_sample))**2
         tau2=m**2*(ex2y2-exy2)
         return tpdm,tau2
     else:
         return tpdm
-
 
 
 
@@ -848,37 +847,85 @@ if 1:
 
     link_dict["COOLEY"]=links_cooley
 
+    # links_Enge=[]
+    # links_Enge.append((1,2))
+    # links_Enge.append((2,3))
+    # links_Enge.append((3,25))
+    # links_Enge.append((25,27))
+    # links_Enge.append((25,26))
+    # links_Enge.append((26,24))
+    # links_Enge.append((24,23))
+    # links_Enge.append((3,4))
+    # links_Enge.append((4,5))
+    # links_Enge.append((5,6))
+    # links_Enge.append((6,7))
+    # links_Enge.append((7,9))
+    # links_Enge.append((9,8))
+    # links_Enge.append((9,10))
+    # links_Enge.append((10,11))
+    # links_Enge.append((11,12))
+    # links_Enge.append((6,20))
+    # links_Enge.append((20,21))
+    # links_Enge.append((21,22))
+    # links_Enge.append((2,14))
+    # links_Enge.append((14,15))
+    # links_Enge.append((15,16))
+    # links_Enge.append((16,19))
+    # links_Enge.append((19,18))
+    # links_Enge.append((18,17))
+    # links_Enge.append((1,13))
+    # links_Enge.append((13,30))
+    # links_Enge.append((30,31))
+    # links_Enge.append((31,28))
+    # links_Enge.append((28,29))
+
+
+
+
+
     links_Enge=[]
-    links_Enge.append((1,2))
-    links_Enge.append((2,3))
-    links_Enge.append((3,25))
-    links_Enge.append((25,27))
-    links_Enge.append((25,26))
-    links_Enge.append((26,24))
-    links_Enge.append((24,23))
-    links_Enge.append((3,4))
-    links_Enge.append((4,5))
     links_Enge.append((5,6))
     links_Enge.append((6,7))
-    links_Enge.append((7,9))
-    links_Enge.append((9,8))
+    links_Enge.append((5,7))
+    links_Enge.append((7,8))
+    links_Enge.append((7,20))
+    links_Enge.append((8,9))
+    links_Enge.append((8,20))
     links_Enge.append((9,10))
     links_Enge.append((10,11))
     links_Enge.append((11,12))
-    links_Enge.append((6,20))
     links_Enge.append((20,21))
     links_Enge.append((21,22))
+    links_Enge.append((1,2))
     links_Enge.append((2,14))
+    links_Enge.append((2,3))
+    links_Enge.append((3,4))
+    links_Enge.append((4,5))
+    links_Enge.append((5,25))
+    links_Enge.append((4,25))
+    links_Enge.append((25,26))
+    links_Enge.append((23,24))
+    links_Enge.append((26,27))
+    links_Enge.append((25,27))
+    links_Enge.append((4,23))
+    links_Enge.append((4,24))    
+    links_Enge.append((1,13))
+    links_Enge.append((1,14))
     links_Enge.append((14,15))
     links_Enge.append((15,16))
-    links_Enge.append((16,19))
-    links_Enge.append((19,18))
-    links_Enge.append((18,17))
-    links_Enge.append((1,13))
+    links_Enge.append((16,17))
+    links_Enge.append((16,18))
+    links_Enge.append((17,18))
+    links_Enge.append((18,19))    
     links_Enge.append((13,30))
+    links_Enge.append((30,1))
     links_Enge.append((30,31))
+    links_Enge.append((31,29))
     links_Enge.append((31,28))
     links_Enge.append((28,29))
+
+
+
 
     link_dict["ENGELKE"]=links_Enge
 

@@ -10,7 +10,7 @@ pd.set_option('display.max_rows', None)
 
 if __name__=="__main__":
 
-    INTERVAL=600
+    INTERVAL=60
     pc_alpha=0.005
     quantile=1
 

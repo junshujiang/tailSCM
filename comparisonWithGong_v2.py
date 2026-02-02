@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     comparison_nodes=np.array([5,9,15,35,50])
     sparcitys=np.array([0.4,0.2,0.1,0.04,0.03])
-    numeberOfData=5000
+    numeberOfData=50000
 
 
 
@@ -174,7 +174,7 @@ if __name__ == '__main__':
     plt.ylim(-0.01, 1)
     # Add title
     # plt.title('Comparison of Two Models Across Experiments')
-
+    plt.ylim(-0.05, 1.05)
     plt.legend(title='', loc='upper right', prop={'size': 16})
     # Set x-axis and y-axis labels, supporting LaTeX characters
     plt.xlabel(r'', fontsize=18)  # Set x-axis label

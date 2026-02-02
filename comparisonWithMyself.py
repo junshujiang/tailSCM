@@ -30,7 +30,7 @@ comparison_number=50
 
 comparison_nodes=np.array([5,9,15,35,50])
 sparcitys=np.array([0.4,0.2,0.1,0.04,0.03])
-numeberOfData=5000
+numeberOfData=50000
 
 
 
@@ -48,6 +48,12 @@ log_path=f"exp_result/{str(max_id)}.ComparisonWithMyself.log"
 
 logger=get_logger(log_path)
 
+
+logger.info(f"numeberOfData: {numeberOfData}")
+logger.info(f"comparison_number: {comparison_number}")
+logger.info(f"sparcitys: {sparcitys}")
+logger.info(f"pc_alpha: {pc_alpha}")
+logger.info(f"quantile: {quantile}")
 
 results={}
 for config_i, nodes_number in enumerate(comparison_nodes):
@@ -68,9 +74,13 @@ for config_i, nodes_number in enumerate(comparison_nodes):
         data_df=pd.DataFrame(X_data.T)
         resultsthis_paper,_=method_this_paper(data_df,quantile=quantile,pc_alpha=pc_alpha,tau_max=0)
         test_number=test_number+1
-        result_this_without_direction.append(compare_graphs(ground_true_graph,resultsthis_paper,True))
-        result_this_direction.append(compare_graphs(ground_true_graph,resultsthis_paper,False))
-        result_remove_undetecable.append(compare_graphs_without_undetectable(resultsthis_paper,ground_true_graph))
+        result_this_without_direction.append(compare_graphs(ground_true_graph,resultsthis_paper,True)[:2])
+        result_this_direction.append(compare_graphs(ground_true_graph,resultsthis_paper,False)[:2])
+        rate,number,edgesNum=compare_graphs_without_undetectable(resultsthis_paper,ground_true_graph)
+        if edgesNum==0:
+            result_remove_undetecable.append([np.nan,np.nan])
+        else:
+            result_remove_undetecable.append([rate,number])
     results[config_i]["THIS_WITHOUT_DIRECTION"]=result_this_without_direction
     results[config_i]["THIS_DIRECTION"]=result_this_direction
     results[config_i]["REMOVE_UNDETECTABLE"]=result_remove_undetecable
@@ -86,7 +96,7 @@ for config_i in results:
     mean=df_tmp_ori.mean()
     std=df_tmp_ori.std()
     df_tmp=pd.concat([mean,std],axis=0)
-    df_tmp.index=["THIS_WITHOUT_DIRECTION_mean","THIS_WITHOUT_DIRECTION_std","THIS_DIRECTION_mean","THIS_DIRECTION_std","REMOVE_UNDETECTABLE_mean","REMOVE_UNDETECTABLE_std"]
+    df_tmp.index=["THIS_WITHOUT_DIRECTION_mean","THIS_DIRECTION_mean","REMOVE_UNDETECTABLE_mean","THIS_WITHOUT_DIRECTION_std","THIS_DIRECTION_std","REMOVE_UNDETECTABLE_std"]
     df_tmp=pd.DataFrame(df_tmp).T    
     results_df.append(df_tmp)
 with open(os.path.join(log_path,f"result_ori.pkl"),"wb") as f:
@@ -114,7 +124,7 @@ df["experiment"] = models * 3
 # Draw grouped boxplot
 custom_palette = ['#1f77b4', 'orange','green']  # First is blue, second is orange
 sns.boxplot(x='experiment', y='values', hue='model', data=df, palette=custom_palette)
-plt.ylim(-0.01, 1)
+plt.ylim(-0.05, 1.05)
 # Add title
 # plt.title('Comparison of Two Models Across Experiments')
 

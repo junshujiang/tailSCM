@@ -149,7 +149,7 @@ if __name__=="__main__":
     # Draw grouped boxplot
     custom_palette = ['#1f77b4', 'green']  # First is blue, second is orange
     sns.boxplot(x='experiment', y='values', hue='model', data=df, palette=custom_palette)
-    plt.ylim(-0.01, 1)
+    plt.ylim(-0.05, 1.05)
     # Add title
     # plt.title('Comparison of Two Models Across Experiments')
 
