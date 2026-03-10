@@ -247,7 +247,11 @@ Output:
 '''
 
 
-def method_this_paper(data_df,quantile=1,tau_max=0,pc_alpha=0.01,tau_min=0,both_tail_variable=0,verbosity=0):
+
+
+
+
+def method_this_paper(data_df,quantile=1,tau_max=0,pc_alpha=0.01,tau_min=0,both_tail_variable=0):
 
     data_df_=data_df.apply(tranform_frechet,axis=0,raw=True)
     dataframeRvier=pp.DataFrame(data_df_.values,var_names=data_df_.columns)
@@ -255,9 +259,10 @@ def method_this_paper(data_df,quantile=1,tau_max=0,pc_alpha=0.01,tau_min=0,both_
     pcmci_parcorr = PCMCI(
         dataframe=dataframeRvier, 
         cond_ind_test=tailparcorr,
-        verbosity=verbosity)
+        verbosity=0)
     results_tail = pcmci_parcorr.run_pcmciplus(tau_max=tau_max, tau_min=tau_min,pc_alpha=pc_alpha)#
     return results_tail["graph"],results_tail
+
 
 class TailParCorr(CondIndTest):
     r"""Partial correlation test.
@@ -418,7 +423,7 @@ class TailParCorr(CondIndTest):
 
         else:
             t_statistics=coeff/(tau2[0,1]**0.5)*(deg_f**0.5)
-            pval = stats.t.sf(t_statistics, deg_f) 
+            pval = stats.t.sf(abs(t_statistics), deg_f) * 2
         
         # if self.enhance_permutation and pval<self.pc_alpha:
         #     for i in range(self.permutation_number):

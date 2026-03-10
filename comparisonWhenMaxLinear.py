@@ -44,7 +44,7 @@ quantile=1
 
 max_id=get_max("../tailSCMdataandlog/exp_result")
 exp_str=""
-log_path=f"../tailSCMdataandlog/exp_result/{str(max_id)}.ComparisonWithMyself.log"
+log_path=f"../tailSCMdataandlog/exp_result/{str(max_id)}.ComparisonWhenDataAreWithMaxLinear.log"
 
 logger=get_logger(log_path)
 
@@ -69,9 +69,8 @@ for config_i, nodes_number in enumerate(comparison_nodes):
         logger.info(f"Test {test_number}")
         adjacency_matrix,ground_true_graph = generate_dag(nodes_number,edge_probability=sparcity)
         IC_1=np.linalg.inv(np.eye(adjacency_matrix.shape[0])-adjacency_matrix)
-        N_data=simulation(numeberOfData,nodes_number).T
-        X_data=otimes(IC_1,N_data,False)
-        data_df=pd.DataFrame(X_data.T)
+        data_df = pd.DataFrame(simulate_max_linear(adjacency_matrix, numeberOfData))
+
         resultsthis_paper,_=method_this_paper(data_df,quantile=quantile,pc_alpha=pc_alpha,tau_max=0)
         test_number=test_number+1
         result_this_without_direction.append(compare_graphs(ground_true_graph,resultsthis_paper,True)[:2])

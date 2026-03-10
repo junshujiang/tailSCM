@@ -7,6 +7,10 @@ from tigramite import plotting as tp
 from tigramite.pcmci import PCMCI
 import matplotlib.pyplot as plt
 from helper_util import *
+import numpy as np
+from collections import deque
+from typing import Optional
+
 from scipy import stats
 import mkl
 import rpy2.robjects as robjects
@@ -33,22 +37,178 @@ def simulation(n,d,alpha=2):
 
 
 
-'''
-Author: Angus
-Description:
-    This function generates a directed acyclic graph (DAG) with a specified number of nodes and a given edge probability (<0.1).
-    The function can also generate a lagged causal DAG if specified (with contemporaneous edges unexists).
-    The generated DAG is represented as a an adjacency matrix, and a edge matrix
 
-Parameters:
-    num_nodes (int): The number of nodes in the DAG.
-    edge_probability (float): The probability of an edge existing between any two nodes.
-    lagged_causal (bool): If True, generates a lagged causal DAG. Default is False.
+def _toposort_from_adjacency(A: np.ndarray):
+    """
+    A[i, j] > 0 means edge j -> i (j is parent of i).
+    Return a topological ordering of nodes if DAG; raise ValueError otherwise.
+    """
+    d = A.shape[0]
 
-Returns:
-    adjacency_matrix (numpy.ndarray): The adjacency matrix of the DAG. (shape: num_nodes * num_nodes). for lagged causal, the adjacency matrix is B[1:num_nodes,num_nodes:2*num_nodes] (the part of one-step lagged causal).
-    edges matrix(numpy.ndarray): 
-'''
+    parents = [np.where(A[i, :] > 0)[0].tolist() for i in range(d)]
+    out_neighbors = [[] for _ in range(d)]
+    indeg = np.array([len(parents[i]) for i in range(d)], dtype=int)
+
+    for i in range(d):
+        for j in parents[i]:
+            out_neighbors[j].append(i)  # j -> i
+
+    q = deque([i for i in range(d) if indeg[i] == 0])
+    order = []
+
+    while q:
+        u = q.popleft()
+        order.append(u)
+        for v in out_neighbors[u]:
+            indeg[v] -= 1
+            if indeg[v] == 0:
+                q.append(v)
+
+    if len(order) != d:
+        raise ValueError("adjacency_matrix is not a DAG (cycle detected).")
+    return order
+
+def simulate_max_linear(
+    adjacency_matrix,
+    n,
+    alpha=1.0,                # tail index for Pareto; shape for Frechet
+):
+    """
+    Simulate max-linear data from a DAG.
+
+    adjacency_matrix: (d, d) array-like
+        A[i, j] is coefficient for edge j -> i.
+    n: int
+        Sample size.
+    alpha: float
+        Tail parameter (>0)
+    """
+    A = np.asarray(adjacency_matrix, dtype=float)
+
+    if A.ndim != 2 or A.shape[0] != A.shape[1]:
+        raise ValueError("adjacency_matrix must be a square (d x d) matrix.")
+    if np.any(A < 0):
+        raise ValueError("adjacency_matrix has negative entries. Use nonnegative weights for max-linear.")
+    if alpha <= 0:
+        raise ValueError("alpha must be > 0.")
+
+    d = A.shape[0]
+    # Noise Z
+
+    Z=simulation(n,d)
+
+
+    order = _toposort_from_adjacency(A)
+    X = np.zeros((n, d), dtype=float)
+
+    for i in order:
+        par = np.where(A[i, :] > 0)[0]  # parents j of i (j -> i)
+        if par.size == 0:
+            X[:, i] = Z[:, i]
+        else:
+            parent_part = (X[:, par] * A[i, par]).max(axis=1)
+            X[:, i] = np.maximum(parent_part, Z[:, i])
+
+    return X
+
+
+
+
+# '''
+# Author: Angus
+# Description:
+#     This function generates a directed acyclic graph (DAG) with a specified number of nodes and a given edge probability (<0.1).
+#     The function can also generate a lagged causal DAG if specified (with contemporaneous edges unexists).
+#     The generated DAG is represented as a an adjacency matrix, and a edge matrix
+
+# Parameters:
+#     num_nodes (int): The number of nodes in the DAG.
+#     edge_probability (float): The probability of an edge existing between any two nodes.
+#     lagged_causal (bool): If True, generates a lagged causal DAG. Default is False.
+
+# Returns:
+#     adjacency_matrix (numpy.ndarray): The adjacency matrix of the DAG. (shape: num_nodes * num_nodes). for lagged causal, the adjacency matrix is B[1:num_nodes,num_nodes:2*num_nodes] (the part of one-step lagged causal).
+#     edges matrix(numpy.ndarray): 
+# '''
+
+# def simulate_extremal_from_dag(
+#     adjacency_matrix,
+#     n,
+#     tau=0.9,
+#     data_type="scm",
+#     sigma=None):
+#     """
+#     给定 DAG 的邻接矩阵，调用 R 的 extremeSCM 最小脚本生成极值数据，返回 (n, d) numpy array。
+
+#     邻接矩阵可为 0/1 或带边权重。约定与 generate_dag 一致：adjacency_matrix[child, parent] = 权重
+#     （即行=子节点，列=父节点）。若为 0/1，则入边权重会均一归一化；若带权重，则按权重归一化。
+
+#     Parameters
+#     ----------
+#     adjacency_matrix : np.ndarray, shape (d, d)
+#         邻接矩阵，可 0/1 或加权。adjacency_matrix[j, i] = 边 i->j 的权重。
+#     n : int
+#         目标样本量，返回矩阵行数为 min(n, 实际行数)。
+#     tau : float, optional
+#         分位数阈值，用于 MS/SCM 的 Pareto 转换。默认 0.9。
+#     data_type : str, optional
+#         'mp' | 'ms' | 'scm'。默认 'scm'。
+#     sigma : np.ndarray, optional
+#         误差协方差（对角），shape (d,d)。默认 diag(d)。
+#     r_script_path : str, optional
+#         sample_given_dag_minimal.R 的路径（相对或绝对）。默认 "sample_given_dag_minimal.R"。
+
+#     Returns
+#     -------
+#     Y : np.ndarray, shape (n, d) 或 (n_actual, d)
+#         Pareto 尺度上的极值数据。n_actual 可能略小于 n（尤其 MP 受 floor(n*(1-tau)) 限制）。
+#     """
+#     import math
+#     d = adjacency_matrix.shape[0]
+#     # R 约定 B_0_w[parent, child] = 权重，即 B_0_w = adjacency_matrix.T
+#     B_0_w = adjacency_matrix.T.astype(float)
+#     # 每列（每个子节点）入边权重和归一化为 1
+#     col_sum = B_0_w.sum(axis=0)
+#     np.place(col_sum, col_sum == 0, 1)
+#     B_0_w = B_0_w / col_sum
+#     B_0 = (B_0_w != 0).astype(float)
+#     B_full = B_0.copy()
+#     if sigma is None:
+#         sigma = np.eye(d)
+#     # 根节点：无入边的列（R 里 1-based）
+#     roots = np.where(B_0.sum(axis=0) == 0)[0]
+#     if len(roots) == 0:
+#         raise ValueError("DAG 无根节点（每列至少一条入边），请检查邻接矩阵。")
+#     root_id = int(roots[0]) + 1
+
+#     r = robjects.r
+#     r("source('sample_given_dag_minimal.R')")
+
+#     r.assign("B_0_w", B_0_w)
+#     r.assign("B_0", B_0)
+#     r.assign("B_full", B_full)
+#     r.assign("Sigma", sigma)
+#     r.assign("root_id", robjects.IntVector([root_id]))
+#     r.assign("tau", robjects.FloatVector([tau]))
+
+#     # MP 行数 = floor(n_raw*(1-tau))；MS/SCM 先抽 n_raw 再阈值，行数约 n_raw*(1-tau)
+#     n_raw = max(n, int(math.ceil(n / (1.0 - tau))))
+#     r.assign("n", robjects.IntVector([n_raw]))
+
+#     if data_type == "mp":
+#         r("Y <- sample_MP(n, tau, B_0_w, Sigma, root_id)")
+#     elif data_type == "ms":
+#         r("Y <- sample_MS(n, tau, B_0_w, Sigma, root_id)")
+#     elif data_type == "scm":
+#         r("Y <- sample_SCM_pareto(n, tau, B_full, B_0, B_0_w, Sigma)")
+#     else:
+#         raise ValueError("data_type 须为 'mp' | 'ms' | 'scm'")
+
+#     Y = np.asarray(r["Y"])
+#     if Y.shape[0] > n:
+#         Y = Y[:n]
+#     return Y
+
 
 def generate_dag(num_nodes, edge_probability=0.3,lagged_causal=False):
 
