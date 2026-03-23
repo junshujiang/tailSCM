@@ -636,8 +636,8 @@ def estimate_tpdm1(array1:np.array,array2:np.array=None,quantile=10,unit_frechet
     tpdm=m*tpdm_
     
     if include_var:
-        ex2y2=np.matmul((filter_1_f**2).T,((filter_2_f)**2))/(needed_sample)
-        exy2=(np.matmul(filter_1_f.T,(filter_2_f))/(needed_sample))**2
+        ex2y2=np.matmul((filter_1_f**2).T,((filter_2_f)**2))/(needed_sample-1)
+        exy2=(np.matmul(filter_1_f.T,(filter_2_f))/(needed_sample-1))**2
         tau2=m**2*(ex2y2-exy2)
         return tpdm,tau2
     else:
